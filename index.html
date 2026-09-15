@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="日々の研究・学習日報を管理するシステム。カレンダーで管理し、週ごとにPDF出力可能。" />
+  <title>📘 DailyLog — 日報管理システム</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Noto+Sans+JP:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ========== Toast Container ========== -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- ========== Print Area (hidden, used for PDF) ========== -->
+  <div id="print-area"></div>
+
+  <!-- ========== Header ========== -->
+  <header class="header">
+    <div class="header-content">
+      <div class="header-left">
+        <h1 class="logo">
+          <span class="logo-icon">📘</span>
+          <span class="logo-text">DailyLog</span>
+        </h1>
+        <p class="logo-sub">日報管理システム — 毎日の記録を、未来のチカラに</p>
+      </div>
+      <div class="header-right">
+        <button class="btn-save-file" id="global-save-btn" title="データをファイルに保存">
+          💾 <span class="save-btn-text">保存</span>
+        </button>
+        <div class="header-date">
+          <div class="header-date-main" id="header-date-main"></div>
+          <div class="header-date-sub" id="header-date-sub"></div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========== Stats Bar ========== -->
+  <div class="stats-bar no-print" id="stats-bar" style="max-width:1600px;margin:0 auto;padding:var(--space-md) var(--space-xl) 0;">
+    <div class="stat-item">
+      <div class="stat-value" id="stat-total">0</div>
+      <div class="stat-label">総記録日数</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="stat-this-week">0</div>
+      <div class="stat-label">今週の記録</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="stat-streak">0</div>
+      <div class="stat-label">連続記録日数</div>
+    </div>
+  </div>
+
+  <!-- ========== Main Content ========== -->
+  <main class="main-content no-print" id="main-content">
+
+    <!-- ===== Left Panel: Calendar + PDF ===== -->
+    <section class="panel panel-left">
+      <div class="card calendar-card">
+        <div class="calendar-header">
+          <button class="cal-nav-btn" id="cal-prev" aria-label="前月">◀</button>
+          <h2 class="calendar-title" id="cal-title"></h2>
+          <button class="cal-nav-btn" id="cal-next" aria-label="翌月">▶</button>
+        </div>
+        <div class="calendar-grid" id="calendar-grid">
+          <div class="cal-day-label sun">日</div>
+          <div class="cal-day-label">月</div>
+          <div class="cal-day-label">火</div>
+          <div class="cal-day-label">水</div>
+          <div class="cal-day-label">木</div>
+          <div class="cal-day-label">金</div>
+          <div class="cal-day-label sat">土</div>
+        </div>
+      </div>
+
+      <!-- Weekly PDF Export -->
+      <div class="card" id="pdf-section">
+        <div class="section-title"><span class="icon">📄</span> 週報PDF出力</div>
+        <div class="week-selector">
+          <select id="week-select"></select>
+        </div>
+        <button class="btn-pdf" id="btn-export-pdf" style="width:100%;">📄 この週のPDFを出力</button>
+      </div>
+
+      <!-- Friday Banner (shown on Fridays) -->
+      <div class="pdf-banner hidden" id="friday-banner">
+        <span class="pdf-banner-icon">🗓️</span>
+        <div class="pdf-banner-text">
+          <div class="pdf-banner-title">今日は金曜日！</div>
+          <div class="pdf-banner-sub">今週の日報をまとめてPDFにしましょう</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Center Panel: Report Entry ===== -->
+    <section class="panel panel-center">
+      <div class="report-panel">
+        <!-- Date header -->
+        <div class="report-date-header">
+          <span class="report-date-text" id="report-date-text"></span>
+          <span class="report-date-day" id="report-date-day"></span>
+          <div class="save-indicator" id="save-indicator">
+            <span>✓</span> 保存済み
+          </div>
+        </div>
+
+        <!-- 0. 本日の目的 -->
+        <div class="report-section" data-section="objective">
+          <div class="report-section-header">
+            <span class="report-section-icon">🎯</span>
+            <span class="report-section-label">本日の目的</span>
+            <span class="report-section-hint">今日達成したかったこと・仮説</span>
+          </div>
+          <textarea
+            class="report-textarea"
+            id="input-objective"
+            data-field="objective"
+            placeholder="例：&#10;・第3章の初稿を完成させる&#10;・実験Aの結果を再現できるか確認する&#10;・仮説：Xの条件ではYが増加するはず"
+          ></textarea>
+        </div>
+
+        <!-- 1. 行ったこと -->
+        <div class="report-section" data-section="done">
+          <div class="report-section-header">
+            <span class="report-section-icon">📋</span>
+            <span class="report-section-label">行ったこと</span>
+            <span class="report-section-hint">今日取り組んだ作業内容</span>
+          </div>
+          <textarea
+            class="report-textarea"
+            id="input-done"
+            data-field="done"
+            placeholder="例：&#10;・論文の第3章を執筆した&#10;・実験データの分析を進めた&#10;・先行研究3本を読んだ"
+          ></textarea>
+        </div>
+
+        <!-- 2. 出来たこと -->
+        <div class="report-section" data-section="achieved">
+          <div class="report-section-header">
+            <span class="report-section-icon">✅</span>
+            <span class="report-section-label">出来たこと</span>
+            <span class="report-section-hint">成果・達成できたこと</span>
+          </div>
+          <textarea
+            class="report-textarea"
+            id="input-achieved"
+            data-field="achieved"
+            placeholder="例：&#10;・第3章の初稿が完成した&#10;・グラフを3つ作成できた&#10;・先行研究の要点を整理できた"
+          ></textarea>
+        </div>
+
+        <!-- 3. 考察・気づき -->
+        <div class="report-section" data-section="insights">
+          <div class="report-section-header">
+            <span class="report-section-icon">💡</span>
+            <span class="report-section-label">考察・気づき</span>
+            <span class="report-section-hint">結果の解釈・想定とのギャップ・新たな発見</span>
+          </div>
+          <textarea
+            class="report-textarea"
+            id="input-insights"
+            data-field="insights"
+            placeholder="例：&#10;・Xの条件ではYが予想に反して減少した → Zの影響が考えられる&#10;・先行研究AとBの結果に矛盾がある → 実験条件の違いを比較する必要あり&#10;・グラフから見ると、閾値は約0.7付近にありそう"
+          ></textarea>
+        </div>
+
+        <!-- 4. 課題点 -->
+        <div class="report-section" data-section="issues">
+          <div class="report-section-header">
+            <span class="report-section-icon">⚠️</span>
+            <span class="report-section-label">課題点</span>
+            <span class="report-section-hint">問題点・改善すべきこと</span>
+          </div>
+          <textarea
+            class="report-textarea"
+            id="input-issues"
+            data-field="issues"
+            placeholder="例：&#10;・分析手法の選定に迷っている&#10;・参考文献が足りない&#10;・集中力が午後に切れやすい"
+          ></textarea>
+        </div>
+
+        <!-- 5. 次回につなげること -->
+        <div class="report-section" data-section="next">
+          <div class="report-section-header">
+            <span class="report-section-icon">🔮</span>
+            <span class="report-section-label">次回につなげること</span>
+            <span class="report-section-hint">明日以降のアクションプラン</span>
+          </div>
+          <textarea
+            class="report-textarea"
+            id="input-next"
+            data-field="next"
+            placeholder="例：&#10;・第4章の構成を考える&#10;・教授に分析手法について相談する&#10;・午前中に集中作業する時間を確保する"
+          ></textarea>
+        </div>
+
+        <!-- 6. 参照文献・資料 -->
+        <div class="report-section" data-section="references">
+          <div class="report-section-header">
+            <span class="report-section-icon">📚</span>
+            <span class="report-section-label">参照文献・資料</span>
+            <span class="report-section-hint">今日参照した論文・サイト・書籍</span>
+          </div>
+          <textarea
+            class="report-textarea"
+            id="input-references"
+            data-field="references"
+            placeholder="例：&#10;・田中ら (2024) 「XXに関する研究」, ○○学会誌, Vol.12, pp.45-60&#10;・Smith et al. (2023) &quot;Title of Paper&quot;, Nature, doi:10.xxxx&#10;・https://example.com/article — ○○についての解説記事&#10;・『書籍名』著者名, 出版社, 2024年, 第3章"
+          ></textarea>
+        </div>
+
+        <!-- 7. 相談・連絡事項 -->
+        <div class="report-section" data-section="consultation">
+          <div class="report-section-header">
+            <span class="report-section-icon">💬</span>
+            <span class="report-section-label">相談・連絡事項</span>
+            <span class="report-section-hint">教授・ラボメンバーへの相談メモ</span>
+          </div>
+          <textarea
+            class="report-textarea"
+            id="input-consultation"
+            data-field="consultation"
+            placeholder="例：&#10;・教授に分析手法Aと手法Bのどちらが適切か相談したい&#10;・○○先輩から△△のプロトコルを教えてもらった&#10;・次回ゼミで実験結果を報告予定"
+          ></textarea>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Right Panel: Previous Day + Integration ===== -->
+    <section class="panel panel-right">
+      <!-- Previous Day Report -->
+      <div class="card prev-day-panel" id="prev-day-card">
+        <div class="section-title"><span class="icon">📖</span> 前日の日報</div>
+        <div id="prev-day-content">
+          <!-- Dynamically filled -->
+        </div>
+      </div>
+
+      <!-- TodoBlaster Integration -->
+      <div class="card integration-card">
+        <div class="integration-header">
+          <div class="section-title" style="margin-bottom:0"><span class="icon">🔗</span> TodoBlaster連携</div>
+          <span class="integration-badge">LINK</span>
+        </div>
+        <p style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:var(--space-md);">
+          タスクをTodoBlasterの大目標に追加できます
+        </p>
+        <div class="integration-form" id="integration-form">
+          <input
+            type="text"
+            class="integration-input"
+            id="integrate-task-name"
+            placeholder="タスク名（例：論文第4章完成）"
+          />
+          <div class="integration-row">
+            <input
+              type="date"
+              class="integration-input"
+              id="integrate-deadline"
+            />
+            <input
+              type="color"
+              class="integration-input"
+              id="integrate-color"
+              value="#3A8FD4"
+              style="padding:4px; height:38px;"
+            />
+          </div>
+          <button class="btn-integrate" id="btn-integrate">
+            🔥 TodoBlasterに追加
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
