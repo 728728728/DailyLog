@@ -3,20 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="日々の研究・学習日報を管理するシステム。カレンダーで管理し、週ごとにPDF出力可能。" />
+  <meta name="description" content="日々の研究・学習日報を管理するシステム。カレンダーで管理し、印刷スタジオで週報・月報をPDF出力できます。" />
   <title>📘 DailyLog — 日報管理システム</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Noto+Sans+JP:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Noto+Sans+JP:wght@400;500;700;800;900&family=Noto+Serif+JP:wght@400;700;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="print-studio.css" />
 </head>
 <body>
 
   <!-- ========== Toast Container ========== -->
   <div id="toast-container" class="toast-container"></div>
 
-  <!-- ========== Print Area (hidden, used for PDF) ========== -->
+  <!-- ========== Print Area (印刷時だけ表示) ========== -->
   <div id="print-area"></div>
 
   <!-- ========== Header ========== -->
@@ -30,7 +31,10 @@
         <p class="logo-sub">日報管理システム — 毎日の記録を、未来のチカラに</p>
       </div>
       <div class="header-right">
-        <button class="btn-save-file" id="global-save-btn" title="データをファイルに保存">
+        <button class="btn-header" id="btn-open-studio" title="印刷スタジオを開く (Ctrl+P)">
+          🖨️ <span class="btn-header-text">印刷</span>
+        </button>
+        <button class="btn-save-file" id="global-save-btn" title="データをファイルに保存 (Ctrl+S)">
           💾 <span class="save-btn-text">保存</span>
         </button>
         <div class="header-date">
@@ -42,7 +46,7 @@
   </header>
 
   <!-- ========== Stats Bar ========== -->
-  <div class="stats-bar no-print" id="stats-bar" style="max-width:1600px;margin:0 auto;padding:var(--space-md) var(--space-xl) 0;">
+  <div class="stats-bar no-print" id="stats-bar">
     <div class="stat-item">
       <div class="stat-value" id="stat-total">0</div>
       <div class="stat-label">総記録日数</div>
@@ -60,7 +64,7 @@
   <!-- ========== Main Content ========== -->
   <main class="main-content no-print" id="main-content">
 
-    <!-- ===== Left Panel: Calendar + PDF ===== -->
+    <!-- ===== Left Panel: Calendar + Print ===== -->
     <section class="panel panel-left">
       <div class="card calendar-card">
         <div class="calendar-header">
@@ -77,15 +81,23 @@
           <div class="cal-day-label">金</div>
           <div class="cal-day-label sat">土</div>
         </div>
+        <div class="cal-legend">
+          <span><i class="lv lv1"></i>少し</span>
+          <span><i class="lv lv2"></i>半分</span>
+          <span><i class="lv lv3"></i>しっかり</span>
+        </div>
       </div>
 
-      <!-- Weekly PDF Export -->
-      <div class="card" id="pdf-section">
-        <div class="section-title"><span class="icon">📄</span> 週報PDF出力</div>
-        <div class="week-selector">
-          <select id="week-select"></select>
+      <!-- Print Studio Launcher -->
+      <div class="card print-launch-card">
+        <div class="section-title"><span class="icon">🖨️</span> 印刷スタジオ</div>
+        <p class="print-launch-desc">プレビューを見ながら、週報・月報・1日分をPDFにできます。長い日報も文字が切れないよう自動でレイアウトします。</p>
+        <div class="print-launch-grid">
+          <button class="btn-launch" data-studio="week">📅 今週</button>
+          <button class="btn-launch" data-studio="prev-week">⏪ 先週</button>
+          <button class="btn-launch" data-studio="day">📝 この日</button>
+          <button class="btn-launch" data-studio="month">🗓️ 今月</button>
         </div>
-        <button class="btn-pdf" id="btn-export-pdf" style="width:100%;">📄 この週のPDFを出力</button>
       </div>
 
       <!-- Friday Banner (shown on Fridays) -->
@@ -95,151 +107,88 @@
           <div class="pdf-banner-title">今日は金曜日！</div>
           <div class="pdf-banner-sub">今週の日報をまとめてPDFにしましょう</div>
         </div>
+        <button class="btn-pdf" data-studio="week">週報を作る</button>
       </div>
     </section>
 
     <!-- ===== Center Panel: Report Entry ===== -->
     <section class="panel panel-center">
-      <div class="report-panel">
+      <div class="report-panel" id="report-panel">
         <!-- Date header -->
         <div class="report-date-header">
-          <span class="report-date-text" id="report-date-text"></span>
-          <span class="report-date-day" id="report-date-day"></span>
-          <div class="save-indicator" id="save-indicator">
-            <span>✓</span> 保存済み
+          <div class="date-nav">
+            <button class="date-nav-btn" id="day-prev" title="前の日 (Alt+←)" aria-label="前の日">‹</button>
+            <button class="date-nav-today" id="day-today" title="今日へ移動">今日</button>
+            <button class="date-nav-btn" id="day-next" title="次の日 (Alt+→)" aria-label="次の日">›</button>
           </div>
+          <div class="report-date-block">
+            <span class="report-date-text" id="report-date-text"></span>
+            <span class="report-date-day" id="report-date-day"></span>
+          </div>
+          <div class="save-indicator" id="save-indicator" aria-live="polite"></div>
         </div>
 
-        <!-- 0. 本日の目的 -->
-        <div class="report-section" data-section="objective">
-          <div class="report-section-header">
-            <span class="report-section-icon">🎯</span>
-            <span class="report-section-label">本日の目的</span>
-            <span class="report-section-hint">今日達成したかったこと・仮説</span>
+        <!-- Progress + mode -->
+        <div class="report-toolbar">
+          <div class="progress-wrap" title="記入済みの項目数">
+            <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+            <span class="progress-text" id="progress-text">0 / 6</span>
           </div>
-          <textarea
-            class="report-textarea"
-            id="input-objective"
-            data-field="objective"
-            placeholder="例：&#10;・第3章の初稿を完成させる&#10;・実験Aの結果を再現できるか確認する&#10;・仮説：Xの条件ではYが増加するはず"
-          ></textarea>
+          <div class="mode-switch" role="tablist" aria-label="入力モード">
+            <button class="mode-btn active" data-mode="list" role="tab">📄 一覧</button>
+            <button class="mode-btn" data-mode="guide" role="tab">🧭 ガイド</button>
+          </div>
+          <button class="icon-btn" id="btn-shortcuts" title="キーボードショートカット" aria-label="ショートカット一覧">⌨️</button>
         </div>
 
-        <!-- 1. 行ったこと -->
-        <div class="report-section" data-section="done">
-          <div class="report-section-header">
-            <span class="report-section-icon">📋</span>
-            <span class="report-section-label">行ったこと</span>
-            <span class="report-section-hint">今日取り組んだ作業内容</span>
-          </div>
-          <textarea
-            class="report-textarea"
-            id="input-done"
-            data-field="done"
-            placeholder="例：&#10;・論文の第3章を執筆した&#10;・実験データの分析を進めた&#10;・先行研究3本を読んだ"
-          ></textarea>
+        <div class="shortcut-help hidden" id="shortcut-help">
+          <div><kbd>Alt</kbd>+<kbd>←</kbd>/<kbd>→</kbd> 前後の日へ</div>
+          <div><kbd>Alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> 前後の項目へ</div>
+          <div><kbd>Ctrl</kbd>+<kbd>Enter</kbd> 次の項目へ（ガイドでは次へ）</div>
+          <div><kbd>Enter</kbd> 箇条書き「・」「1.」を自動で続ける</div>
+          <div><kbd>Ctrl</kbd>+<kbd>S</kbd> ファイル保存 ／ <kbd>Ctrl</kbd>+<kbd>P</kbd> 印刷スタジオ</div>
         </div>
 
-        <!-- 2. 出来たこと -->
-        <div class="report-section" data-section="achieved">
-          <div class="report-section-header">
-            <span class="report-section-icon">✅</span>
-            <span class="report-section-label">出来たこと</span>
-            <span class="report-section-hint">成果・達成できたこと</span>
+        <!-- Carry-over suggestion -->
+        <div class="carry-banner hidden" id="carry-banner">
+          <div class="carry-text">
+            <div class="carry-title">↩ 前回（<span id="carry-date"></span>）の「次回につなげること」</div>
+            <div class="carry-preview" id="carry-preview"></div>
           </div>
-          <textarea
-            class="report-textarea"
-            id="input-achieved"
-            data-field="achieved"
-            placeholder="例：&#10;・第3章の初稿が完成した&#10;・グラフを3つ作成できた&#10;・先行研究の要点を整理できた"
-          ></textarea>
+          <button class="btn-carry" id="btn-carry">今日の目的に取り込む</button>
+          <button class="carry-dismiss" id="carry-dismiss" aria-label="閉じる">✕</button>
         </div>
 
-        <!-- 3. 考察・気づき -->
-        <div class="report-section" data-section="insights">
-          <div class="report-section-header">
-            <span class="report-section-icon">💡</span>
-            <span class="report-section-label">考察・気づき</span>
-            <span class="report-section-hint">結果の解釈・想定とのギャップ・新たな発見</span>
-          </div>
-          <textarea
-            class="report-textarea"
-            id="input-insights"
-            data-field="insights"
-            placeholder="例：&#10;・Xの条件ではYが予想に反して減少した → Zの影響が考えられる&#10;・先行研究AとBの結果に矛盾がある → 実験条件の違いを比較する必要あり&#10;・グラフから見ると、閾値は約0.7付近にありそう"
-          ></textarea>
+        <!-- Quick log -->
+        <div class="quick-log">
+          <select id="quick-log-field" aria-label="追記先の項目"></select>
+          <input type="text" id="quick-log-input" placeholder="やったことを一行で → Enterで時刻付きで追記" autocomplete="off" />
+          <button id="quick-log-add" class="btn-quick">追記</button>
         </div>
 
-        <!-- 4. 課題点 -->
-        <div class="report-section" data-section="issues">
-          <div class="report-section-header">
-            <span class="report-section-icon">⚠️</span>
-            <span class="report-section-label">課題点</span>
-            <span class="report-section-hint">問題点・改善すべきこと</span>
-          </div>
-          <textarea
-            class="report-textarea"
-            id="input-issues"
-            data-field="issues"
-            placeholder="例：&#10;・分析手法の選定に迷っている&#10;・参考文献が足りない&#10;・集中力が午後に切れやすい"
-          ></textarea>
+        <!-- Guide navigation (guide mode only) -->
+        <div class="guide-nav hidden" id="guide-nav">
+          <div class="guide-steps" id="guide-steps"></div>
         </div>
 
-        <!-- 5. 次回につなげること -->
-        <div class="report-section" data-section="next">
-          <div class="report-section-header">
-            <span class="report-section-icon">🔮</span>
-            <span class="report-section-label">次回につなげること</span>
-            <span class="report-section-hint">明日以降のアクションプラン</span>
-          </div>
-          <textarea
-            class="report-textarea"
-            id="input-next"
-            data-field="next"
-            placeholder="例：&#10;・第4章の構成を考える&#10;・教授に分析手法について相談する&#10;・午前中に集中作業する時間を確保する"
-          ></textarea>
+        <!-- Sections are generated by app.js -->
+        <div class="report-sections" id="report-sections"></div>
+
+        <div class="guide-footer hidden" id="guide-footer">
+          <button class="btn-guide" id="guide-prev">← 前へ</button>
+          <span class="guide-count" id="guide-count"></span>
+          <button class="btn-guide primary" id="guide-next">次へ →</button>
         </div>
 
-        <!-- 6. 参照文献・資料 -->
-        <div class="report-section" data-section="references">
-          <div class="report-section-header">
-            <span class="report-section-icon">📚</span>
-            <span class="report-section-label">参照文献・資料</span>
-            <span class="report-section-hint">今日参照した論文・サイト・書籍</span>
-          </div>
-          <textarea
-            class="report-textarea"
-            id="input-references"
-            data-field="references"
-            placeholder="例：&#10;・田中ら (2024) 「XXに関する研究」, ○○学会誌, Vol.12, pp.45-60&#10;・Smith et al. (2023) &quot;Title of Paper&quot;, Nature, doi:10.xxxx&#10;・https://example.com/article — ○○についての解説記事&#10;・『書籍名』著者名, 出版社, 2024年, 第3章"
-          ></textarea>
-        </div>
-
-        <!-- 7. 相談・連絡事項 -->
-        <div class="report-section" data-section="consultation">
-          <div class="report-section-header">
-            <span class="report-section-icon">💬</span>
-            <span class="report-section-label">相談・連絡事項</span>
-            <span class="report-section-hint">教授・ラボメンバーへの相談メモ</span>
-          </div>
-          <textarea
-            class="report-textarea"
-            id="input-consultation"
-            data-field="consultation"
-            placeholder="例：&#10;・教授に分析手法Aと手法Bのどちらが適切か相談したい&#10;・○○先輩から△△のプロトコルを教えてもらった&#10;・次回ゼミで実験結果を報告予定"
-          ></textarea>
-        </div>
+        <div class="optional-toggle-row" id="optional-row"></div>
       </div>
     </section>
 
-    <!-- ===== Right Panel: Previous Day + Integration ===== -->
+    <!-- ===== Right Panel: Previous Report + Integration ===== -->
     <section class="panel panel-right">
-      <!-- Previous Day Report -->
       <div class="card prev-day-panel" id="prev-day-card">
-        <div class="section-title"><span class="icon">📖</span> 前日の日報</div>
-        <div id="prev-day-content">
-          <!-- Dynamically filled -->
-        </div>
+        <div class="section-title"><span class="icon">📖</span> 前回の日報</div>
+        <div id="prev-day-content"></div>
       </div>
 
       <!-- TodoBlaster Integration -->
@@ -248,40 +197,127 @@
           <div class="section-title" style="margin-bottom:0"><span class="icon">🔗</span> TodoBlaster連携</div>
           <span class="integration-badge">LINK</span>
         </div>
-        <p style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:var(--space-md);">
-          タスクをTodoBlasterの大目標に追加できます
-        </p>
+        <p class="integration-desc">タスクをTodoBlasterの大目標に追加できます</p>
         <div class="integration-form" id="integration-form">
-          <input
-            type="text"
-            class="integration-input"
-            id="integrate-task-name"
-            placeholder="タスク名（例：論文第4章完成）"
-          />
+          <input type="text" class="integration-input" id="integrate-task-name" placeholder="タスク名（例：論文第4章完成）" />
           <div class="integration-row">
-            <input
-              type="date"
-              class="integration-input"
-              id="integrate-deadline"
-            />
-            <input
-              type="color"
-              class="integration-input"
-              id="integrate-color"
-              value="#3A8FD4"
-              style="padding:4px; height:38px;"
-            />
+            <input type="date" class="integration-input" id="integrate-deadline" />
+            <input type="color" class="integration-input" id="integrate-color" value="#3A8FD4" style="padding:4px; height:38px;" />
           </div>
-          <button class="btn-integrate" id="btn-integrate">
-            🔥 TodoBlasterに追加
-          </button>
+          <button class="btn-integrate" id="btn-integrate">🔥 TodoBlasterに追加</button>
         </div>
       </div>
     </section>
 
   </main>
 
+  <!-- ========== Print Studio (modal) ========== -->
+  <div class="studio hidden" id="print-studio" role="dialog" aria-modal="true" aria-labelledby="studio-title">
+    <div class="studio-shell">
+      <header class="studio-head">
+        <h2 id="studio-title">🖨️ 印刷スタジオ</h2>
+        <span class="studio-meta" id="studio-meta"></span>
+        <button class="studio-close" id="studio-close" aria-label="閉じる">✕</button>
+      </header>
+
+      <div class="studio-body">
+        <aside class="studio-controls">
+          <!-- 期間 -->
+          <div class="ctl-group">
+            <div class="ctl-label">期間</div>
+            <div class="seg" id="ps-range-mode">
+              <button data-v="day">1日</button>
+              <button data-v="week">週</button>
+              <button data-v="month">月</button>
+              <button data-v="custom">指定</button>
+            </div>
+            <div class="range-row">
+              <button class="range-shift" id="ps-range-prev" aria-label="前の期間">‹</button>
+              <input type="date" id="ps-from" aria-label="開始日" />
+              <span class="range-sep">〜</span>
+              <input type="date" id="ps-to" aria-label="終了日" />
+              <button class="range-shift" id="ps-range-next" aria-label="次の期間">›</button>
+            </div>
+          </div>
+
+          <!-- レイアウト -->
+          <div class="ctl-group">
+            <div class="ctl-label">レイアウト</div>
+            <div class="layout-cards" id="ps-layout">
+              <button class="layout-card" data-v="daily">
+                <span class="lc-thumb lc-daily"><i></i><i></i><i></i><i></i></span>
+                <span class="lc-name">1日1ページ</span>
+                <span class="lc-desc">提出用。余白は書き込み欄に</span>
+              </button>
+              <button class="layout-card" data-v="flow">
+                <span class="lc-thumb lc-flow"><i></i><i></i></span>
+                <span class="lc-name">2段組・連続</span>
+                <span class="lc-desc">論文風。紙を節約</span>
+              </button>
+              <button class="layout-card" data-v="table">
+                <span class="lc-thumb lc-table"><i></i><i></i><i></i><i></i><i></i></span>
+                <span class="lc-name">一覧表（横）</span>
+                <span class="lc-desc">1週間を1枚で俯瞰</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 項目 -->
+          <div class="ctl-group">
+            <div class="ctl-label">載せる項目</div>
+            <div class="field-checks" id="ps-fields"></div>
+            <label class="chk"><input type="checkbox" id="ps-merge" /> 「課題点」と「次回」を1つの欄にまとめる</label>
+          </div>
+
+          <!-- オプション -->
+          <div class="ctl-group">
+            <div class="ctl-label">オプション</div>
+            <label class="chk"><input type="checkbox" id="ps-cover" /> 表紙とサマリー（2日以上のとき）</label>
+            <label class="chk"><input type="checkbox" id="ps-skip-empty" /> 未記入の日を省く</label>
+            <label class="chk"><input type="checkbox" id="ps-comment" /> 指導者コメント欄</label>
+            <label class="chk"><input type="checkbox" id="ps-stamp" /> 確認印の欄</label>
+            <label class="chk"><input type="checkbox" id="ps-color" /> カラーで印刷</label>
+            <div class="ctl-row">
+              <span>土日</span>
+              <select id="ps-weekends">
+                <option value="auto">記入がある日だけ</option>
+                <option value="always">すべて含める</option>
+                <option value="never">含めない</option>
+              </select>
+            </div>
+            <div class="ctl-row">
+              <span>書体</span>
+              <select id="ps-font">
+                <option value="sans">ゴシック</option>
+                <option value="serif">明朝</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 作成者 -->
+          <div class="ctl-group">
+            <div class="ctl-label">表記</div>
+            <input type="text" class="ctl-input" id="ps-title" placeholder="タイトル（空欄で自動）" />
+            <input type="text" class="ctl-input" id="ps-affiliation" placeholder="所属（例：○○研究室）" />
+            <input type="text" class="ctl-input" id="ps-author" placeholder="氏名" />
+          </div>
+        </aside>
+
+        <div class="studio-preview-wrap" id="studio-preview-wrap">
+          <div class="studio-preview" id="studio-preview"></div>
+        </div>
+      </div>
+
+      <footer class="studio-foot">
+        <span class="studio-fit" id="studio-fit"></span>
+        <button class="btn-studio" id="ps-copy">📋 テキストでコピー</button>
+        <button class="btn-studio primary" id="ps-print">🖨️ 印刷 / PDFに保存</button>
+      </footer>
+    </div>
+  </div>
+
   <script src="data.js"></script>
   <script src="app.js"></script>
+  <script src="print-studio.js"></script>
 </body>
 </html>
