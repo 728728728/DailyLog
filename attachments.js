@@ -167,17 +167,17 @@ function renderAttachments() {
 
     const label = attLabel(att, list);
     const options = attSectionOptions()
-      .map(o => `<option value="${o.value}"${o.value === (att.section || '') ? ' selected' : ''}>${escapeHtml(o.label)}</option>`)
+      .map(o => `<option value="${escapeAttr(o.value)}"${o.value === (att.section || '') ? ' selected' : ''}>${escapeHtml(o.label)}</option>`)
       .join('');
 
     const preview = att.kind === 'image'
-      ? `<button type="button" class="attach-thumb" data-act="zoom" title="クリックで拡大"><img src="${att.src}" alt="${escapeHtml(att.caption || label)}" loading="lazy"></button>`
-      : `<textarea class="attach-tsv" data-act="tsv" spellcheck="false" rows="4" aria-label="${label}の内容（タブ区切り）">${escapeHtml(att.tsv)}</textarea>`;
+      ? `<button type="button" class="attach-thumb" data-act="zoom" title="クリックで拡大"><img src="${safeImageSrc(att.src)}" alt="${escapeAttr(att.caption || label)}" loading="lazy"></button>`
+      : `<textarea class="attach-tsv" data-act="tsv" spellcheck="false" rows="4" aria-label="${escapeAttr(label)}の内容（タブ区切り）">${escapeHtml(att.tsv)}</textarea>`;
 
     item.innerHTML = `
       <div class="attach-head">
         <span class="attach-label">${label}</span>
-        <input type="text" class="attach-caption" data-act="caption" value="${escapeHtml(att.caption)}"
+        <input type="text" class="attach-caption" data-act="caption" value="${escapeAttr(att.caption)}"
                placeholder="説明（例：モデル別のF2スコア比較）" />
         <div class="attach-tools">
           <button type="button" class="attach-mini" data-act="up" title="上へ" ${idx === 0 ? 'disabled' : ''}>↑</button>

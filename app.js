@@ -123,6 +123,16 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// HTML属性に埋め込む値用。escapeHtmlは引用符を変換しないので、属性から抜け出せてしまう
+function escapeAttr(str) {
+  return escapeHtml(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// img の src には、自分で作ったdata URLだけを通す
+function safeImageSrc(src) {
+  return (typeof src === 'string' && /^data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]*$/.test(src)) ? src : '';
+}
+
 function hasContent(report) {
   if (!report) return false;
   if (Array.isArray(report.attachments) && report.attachments.length) return true;
@@ -889,9 +899,9 @@ function renderPrevDay() {
           ${atts.map(a => {
             const label = attLabel(a, atts);
             const inner = a.kind === 'image'
-              ? `<img src="${a.src}" alt="${escapeHtml(a.caption || label)}">`
+              ? `<img src="${safeImageSrc(a.src)}" alt="${escapeAttr(a.caption || label)}">`
               : `<div class="prev-thumb-label">▦</div>`;
-            return `<div class="prev-thumb" title="${escapeHtml(a.caption || '')}">${inner}<div class="prev-thumb-label">${label}</div></div>`;
+            return `<div class="prev-thumb" title="${escapeAttr(a.caption || '')}">${inner}<div class="prev-thumb-label">${escapeHtml(label)}</div></div>`;
           }).join('')}
         </div>
       </div>

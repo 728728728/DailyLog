@@ -1,5 +1,10 @@
-# Personal data
+# Personal data（公開リポジトリなので、控えやコピーも必ず除外する）
 data.js
+data*.js
+*データ*.js
+*コピー*
+*copy*
+*backup*
 backup.json
 
 # OS/Editor settings

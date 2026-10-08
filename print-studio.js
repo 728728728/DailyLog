@@ -218,7 +218,7 @@ function psAtts(report) {
   if (!ps.figures) return [];
   const list = Array.isArray(report.attachments) ? report.attachments : [];
   return list
-    .filter(a => (a.kind === 'image' ? !!a.src : !!(a.tsv || '').trim()))
+    .filter(a => (a.kind === 'image' ? !!safeImageSrc(a.src) : !!(a.tsv || '').trim()))
     .map(a => ({ ...a, label: attLabel(a, list) }));
 }
 
@@ -261,7 +261,7 @@ function psFigEl(att, { height = 40 } = {}) {
   fig.style.setProperty('--fig-h', `${(height * (PS_FIG_SCALE[ps.figSize] || 1)).toFixed(1)}mm`);
   if (att.kind === 'image') {
     fig.style.setProperty('--ar', (att.w / att.h).toFixed(4));
-    fig.innerHTML = `<div class="ps-fig-box"><img src="${att.src}" alt=""></div>${psFigCaption(att)}`;
+    fig.innerHTML = `<div class="ps-fig-box"><img src="${safeImageSrc(att.src)}" alt=""></div>${psFigCaption(att)}`;
   } else {
     // 表はキャプションを上に置く（日本語の慣例）
     fig.innerHTML = `${psFigCaption(att)}${psAttTableHtml(att)}`;
