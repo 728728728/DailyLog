@@ -299,11 +299,18 @@
             <label class="chk"><input type="checkbox" id="ps-color" /> カラーで印刷</label>
             <label class="chk"><input type="checkbox" id="ps-figures" /> 図・表を入れる</label>
             <div class="ctl-row">
-              <span>図の大きさ</span>
+              <span>図の入れ方</span>
+              <select id="ps-fig-placement">
+                <option value="page">別ページに大きく</option>
+                <option value="inline">本文の中に小さく</option>
+              </select>
+            </div>
+            <div class="ctl-row">
+              <span id="ps-fig-size-label">1ページに</span>
               <select id="ps-fig-size">
-                <option value="small">小さめ</option>
-                <option value="auto">標準</option>
-                <option value="large">大きめ</option>
+                <option value="large">1枚ずつ（最大）</option>
+                <option value="auto">2枚ずつ</option>
+                <option value="small">4枚ずつ</option>
               </select>
             </div>
             <div class="ctl-row">

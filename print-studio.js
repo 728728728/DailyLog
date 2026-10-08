@@ -22,10 +22,12 @@ const PS_DEFAULTS = {
   affiliation: '',
   author: '',
   figures: true,
+  figPlacement: 'page',   // page: 別ページに大きく / inline: 本文の中に
   figSize: 'auto',
 };
 
 const PS_FIG_SCALE = { small: 0.75, auto: 1, large: 1.3 };
+const PS_FIG_PER_PAGE = { large: 1, auto: 2, small: 4 }; // 別ページのとき
 
 const PS_FONT_MAX = 9.5;   // pt
 const PS_FONT_MIN = 6.5;   // pt
@@ -255,10 +257,10 @@ function psFigCaption(att) {
   return `<figcaption class="ps-fig-cap"><b>${escapeHtml(att.label)}</b>${att.caption ? '　' + escapeHtml(att.caption) : ''}</figcaption>`;
 }
 
-function psFigEl(att, { height = 40 } = {}) {
+function psFigEl(att, { height = 40, fill = false } = {}) {
   const fig = document.createElement('figure');
-  fig.className = `ps-fig ps-fig-${att.kind}`;
-  fig.style.setProperty('--fig-h', `${(height * (PS_FIG_SCALE[ps.figSize] || 1)).toFixed(1)}mm`);
+  fig.className = `ps-fig ps-fig-${att.kind}${fill ? ' ps-fig-fill' : ''}`;
+  if (!fill) fig.style.setProperty('--fig-h', `${(height * (PS_FIG_SCALE[ps.figSize] || 1)).toFixed(1)}mm`);
   if (att.kind === 'image') {
     fig.style.setProperty('--ar', (att.w / att.h).toFixed(4));
     fig.innerHTML = `<div class="ps-fig-box"><img src="${safeImageSrc(att.src)}" alt=""></div>${psFigCaption(att)}`;
@@ -276,33 +278,40 @@ function psFigGroup(atts, opts) {
   return wrap;
 }
 
-// 図・表だけのページ（本文に入りきらなかった分）
+// 図・表のページ（別表）。1ページに載せる枚数で大きさが決まる
 function psRenderFigPages(stage, dateKey, atts, { landscape = false } = {}) {
-  let area = null;
-  const newPage = () => {
+  const per = PS_FIG_PER_PAGE[ps.figSize] || 2;
+  // 縦置きは縦に並べ、横置きは横に並べる
+  const cols = landscape ? (per >= 2 ? 2 : 1) : (per >= 4 ? 2 : 1);
+
+  for (let i = 0; i < atts.length; i += per) {
+    const chunk = atts.slice(i, i + per);
+    // 最後のページが半端な枚数でも、紙の高さを使い切る
+    const rows = Math.max(1, Math.ceil(chunk.length / cols));
     const page = psNewPage(stage, { kind: 'ps-kind-figs', landscape });
     const body = page.querySelector('.ps-body');
+    const part = atts.length > per ? `（${Math.floor(i / per) + 1}/${Math.ceil(atts.length / per)}）` : '';
     body.innerHTML = `
       <div class="ps-day-head">
         <div>
           <div class="ps-day-date">${psDateLong(dateKey)}</div>
-          <div class="ps-day-meta">図・表</div>
+          <div class="ps-day-meta">図・表${part}</div>
         </div>
+        ${psStampBoxes()}
       </div>
-      <div class="ps-fixed ps-figs ps-figs-page"></div>
+      <div class="ps-fixed ps-figs-page" style="--cols:${cols};--rows:${rows}"></div>
     `;
-    area = body.querySelector('.ps-figs-page');
-  };
-  newPage();
-  atts.forEach(a => {
-    const el = psFigEl(a, { height: landscape ? 52 : 62 });
-    area.appendChild(el);
-    if (psOverflows(area) && area.children.length > 1) {
-      el.remove();
-      newPage();
-      area.appendChild(el);
+    const area = body.querySelector('.ps-figs-page');
+    chunk.forEach(a => area.appendChild(psFigEl(a, { fill: true })));
+
+    // 表が大きすぎる場合だけ文字を詰める（画像は枠に合わせて縮む）
+    const over = () => psOverflows(area) || [...area.querySelectorAll('.ps-att-table')].some(t => t.scrollWidth > t.parentElement.clientWidth + 1);
+    let fs = PS_FONT_MAX;
+    while (over() && fs > PS_FONT_MIN) {
+      fs = Math.max(PS_FONT_MIN, fs - 0.25);
+      page.style.setProperty('--fs', `${fs}pt`);
     }
-  });
+  }
 }
 
 // ===== レイアウトA: 1日1ページ =====
@@ -334,14 +343,14 @@ function psRenderDaily(stage, dateKey) {
       const secBody = sec.querySelector('.ps-sec-body');
       secBody.innerHTML = psLines(b.text).join('');
       if (withFigs && attMap[b.key]) {
-        secBody.appendChild(psFigGroup(attMap[b.key], { height: 36 }));
+        secBody.appendChild(psFigGroup(attMap[b.key], { height: 44 }));
         sec.classList.remove('ps-empty');
       }
       fixed.appendChild(sec);
     });
     if (withFigs && attMap['']) {
       const sec = psSectionShell({ key: 'figs', label: '図・表', color: '#64748B', text: ' ' });
-      sec.querySelector('.ps-sec-body').appendChild(psFigGroup(attMap[''], { height: 40 }));
+      sec.querySelector('.ps-sec-body').appendChild(psFigGroup(attMap[''], { height: 48 }));
       fixed.appendChild(sec);
     }
     if (ps.comment) {
@@ -371,7 +380,23 @@ function psRenderDaily(stage, dateKey) {
     return { ok: fits(), fs };
   };
 
-  const hasFigs = Object.keys(attMap).length > 0;
+  const allAtts = psAtts(report);
+  const inline = ps.figPlacement === 'inline';
+  const hasFigs = inline && Object.keys(attMap).length > 0;
+
+  if (!inline && allAtts.length) {
+    // 「別ページに大きく」：本文は本文だけで組み、図は後ろのページへ
+    buildSections(false);
+    const rp = fitPage();
+    if (rp.ok) {
+      psRenderFigPages(stage, dateKey, allAtts);
+      return { shrunk: rp.fs < PS_FONT_MAX ? rp.fs : null, split: false, figsMoved: false };
+    }
+    stage.removeChild(page.parentElement);
+    psFlowRender(stage, [dateKey], { columns: 1, kind: 'ps-kind-daily', dayPerPage: true });
+    return { shrunk: null, split: true, figsMoved: false };
+  }
+
   buildSections(hasFigs);
   let r = fitPage(hasFigs ? { fsFloor: 7.5, figFloor: 0.8 } : {});
   if (r.ok) return { shrunk: r.fs < PS_FONT_MAX ? r.fs : null, split: false, figsMoved: false };
@@ -438,9 +463,9 @@ function psFlowRender(stage, dates, { columns = 2, kind = 'ps-kind-flow', dayPer
 
     // 図・表は途中で切れないので、入らなければ次の段へ送る
     const placeFigs = (atts) => {
-      if (!atts) return;
+      if (!atts || ps.figPlacement !== 'inline') return;
       atts.forEach(a => {
-        const el = psFigEl(a, { height: columns === 2 ? 34 : 46 });
+        const el = psFigEl(a, { height: columns === 2 ? 40 : 52 });
         col().appendChild(el);
         if (psOverflows(col()) && col().children.length > 1) {
           el.remove();
@@ -450,8 +475,9 @@ function psFlowRender(stage, dates, { columns = 2, kind = 'ps-kind-flow', dayPer
       });
     };
 
+    const inlineFigs = ps.figPlacement === 'inline';
     psBlocks(report).forEach(block => {
-      if (!block.text && !attMap[block.key]) return; // 流し込みでは空欄を省く
+      if (!block.text && !(inlineFigs && attMap[block.key])) return; // 流し込みでは空欄を省く
       if (!block.text) { placeFigs(attMap[block.key]); return; }
       let sec = psSectionShell(block);
       placeKeepWithNext(sec, 10);
@@ -713,6 +739,14 @@ async function psRender() {
     if (figsMoved) notes.push(`${figsMoved}日分は図・表を別ページにしました`);
   } else if (ps.layout === 'flow') {
     psFlowRender(stage, dates, { columns: 2 });
+    if (ps.figPlacement !== 'inline') {
+      let figDays = 0;
+      dates.forEach(k => {
+        const atts = psAtts(state.reports[k] || {});
+        if (atts.length) { psRenderFigPages(stage, k, atts); figDays++; }
+      });
+      if (figDays) notes.push(`図・表は後ろのページにまとめました（${figDays}日分）`);
+    }
   } else {
     const r = psRenderTable(stage, dates);
     if (r.perPage < Math.min(7, dates.length)) notes.push(`文字量が多いため1ページ${r.perPage}日に分割しました`);
@@ -780,8 +814,16 @@ function psSyncControls() {
   $('#ps-stamp').checked = ps.stamp;
   $('#ps-color').checked = ps.color;
   $('#ps-figures').checked = ps.figures;
+  $('#ps-fig-placement').value = ps.figPlacement;
+  $('#ps-fig-placement').disabled = !ps.figures;
   $('#ps-fig-size').value = ps.figSize;
   $('#ps-fig-size').disabled = !ps.figures;
+  $('#ps-fig-size-label').textContent = ps.figPlacement === 'inline' ? '図の大きさ' : '1ページに';
+  $$('#ps-fig-size option').forEach(o => {
+    o.textContent = ps.figPlacement === 'inline'
+      ? { small: '小さめ', auto: '標準', large: '大きめ' }[o.value]
+      : { small: '4枚ずつ', auto: '2枚ずつ', large: '1枚ずつ（最大）' }[o.value];
+  });
   $('#ps-weekends').value = ps.weekends;
   $('#ps-font').value = ps.font;
   $('#ps-title').value = ps.title;
@@ -846,6 +888,7 @@ function psInitControls() {
   bind('#ps-stamp', 'stamp');
   bind('#ps-color', 'color');
   bind('#ps-figures', 'figures');
+  bind('#ps-fig-placement', 'figPlacement', 'value');
   bind('#ps-fig-size', 'figSize', 'value');
   bind('#ps-weekends', 'weekends', 'value');
   bind('#ps-font', 'font', 'value');
