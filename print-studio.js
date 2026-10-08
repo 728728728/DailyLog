@@ -21,7 +21,11 @@ const PS_DEFAULTS = {
   title: '',
   affiliation: '',
   author: '',
+  figures: true,
+  figSize: 'auto',
 };
+
+const PS_FIG_SCALE = { small: 0.75, auto: 1, large: 1.3 };
 
 const PS_FONT_MAX = 9.5;   // pt
 const PS_FONT_MIN = 6.5;   // pt
@@ -208,6 +212,99 @@ function psStampBoxes() {
   return `<div class="ps-stamps"><div class="ps-stamp"><span>確認</span></div><div class="ps-stamp"><span>確認</span></div></div>`;
 }
 
+
+// ===== 図・表 =====
+function psAtts(report) {
+  if (!ps.figures) return [];
+  const list = Array.isArray(report.attachments) ? report.attachments : [];
+  return list
+    .filter(a => (a.kind === 'image' ? !!a.src : !!(a.tsv || '').trim()))
+    .map(a => ({ ...a, label: attLabel(a, list) }));
+}
+
+// 印刷位置ごとに仕分ける（載せない項目に紐づくものは末尾へ）
+function psAttsBySection(report) {
+  const map = {};
+  const merged = ps.merge && ps.fields.issues && ps.fields.next;
+  psAtts(report).forEach(a => {
+    let key = a.section && ps.fields[a.section] ? a.section : '';
+    if (merged && (key === 'issues' || key === 'next')) key = 'issues_next';
+    (map[key] = map[key] || []).push(a);
+  });
+  return map;
+}
+
+function psAttTableHtml(att) {
+  const raw = (att.tsv || '').replace(/\r\n?/g, '\n').replace(/\n+$/, '');
+  if (!raw.trim()) return '';
+  const rows = raw.split('\n').map(r => r.split('\t'));
+  const cell = (v, tag) => {
+    const num = v.trim() !== '' && /^[-+]?[\d,]+(\.\d+)?%?$/.test(v.trim());
+    return `<${tag}${num ? ' class="ps-num"' : ''}>${psInline(v)}</${tag}>`;
+  };
+  const head = att.header
+    ? `<thead><tr>${rows[0].map(v => cell(v, 'th')).join('')}</tr></thead>`
+    : '';
+  const bodyRows = att.header ? rows.slice(1) : rows;
+  return `<table class="ps-att-table">${head}<tbody>${
+    bodyRows.map(r => `<tr>${r.map(v => cell(v, 'td')).join('')}</tr>`).join('')
+  }</tbody></table>`;
+}
+
+function psFigCaption(att) {
+  return `<figcaption class="ps-fig-cap"><b>${escapeHtml(att.label)}</b>${att.caption ? '　' + escapeHtml(att.caption) : ''}</figcaption>`;
+}
+
+function psFigEl(att, { height = 40 } = {}) {
+  const fig = document.createElement('figure');
+  fig.className = `ps-fig ps-fig-${att.kind}`;
+  fig.style.setProperty('--fig-h', `${(height * (PS_FIG_SCALE[ps.figSize] || 1)).toFixed(1)}mm`);
+  if (att.kind === 'image') {
+    fig.style.setProperty('--ar', (att.w / att.h).toFixed(4));
+    fig.innerHTML = `<div class="ps-fig-box"><img src="${att.src}" alt=""></div>${psFigCaption(att)}`;
+  } else {
+    // 表はキャプションを上に置く（日本語の慣例）
+    fig.innerHTML = `${psFigCaption(att)}${psAttTableHtml(att)}`;
+  }
+  return fig;
+}
+
+function psFigGroup(atts, opts) {
+  const wrap = document.createElement('div');
+  wrap.className = 'ps-figs';
+  atts.forEach(a => wrap.appendChild(psFigEl(a, opts)));
+  return wrap;
+}
+
+// 図・表だけのページ（本文に入りきらなかった分）
+function psRenderFigPages(stage, dateKey, atts, { landscape = false } = {}) {
+  let area = null;
+  const newPage = () => {
+    const page = psNewPage(stage, { kind: 'ps-kind-figs', landscape });
+    const body = page.querySelector('.ps-body');
+    body.innerHTML = `
+      <div class="ps-day-head">
+        <div>
+          <div class="ps-day-date">${psDateLong(dateKey)}</div>
+          <div class="ps-day-meta">図・表</div>
+        </div>
+      </div>
+      <div class="ps-fixed ps-figs ps-figs-page"></div>
+    `;
+    area = body.querySelector('.ps-figs-page');
+  };
+  newPage();
+  atts.forEach(a => {
+    const el = psFigEl(a, { height: landscape ? 52 : 62 });
+    area.appendChild(el);
+    if (psOverflows(area) && area.children.length > 1) {
+      el.remove();
+      newPage();
+      area.appendChild(el);
+    }
+  });
+}
+
 // ===== レイアウトA: 1日1ページ =====
 function psRenderDaily(stage, dateKey) {
   const report = state.reports[dateKey] || {};
@@ -228,31 +325,71 @@ function psRenderDaily(stage, dateKey) {
     <div class="ps-fixed"></div>
   `;
   const fixed = body.querySelector('.ps-fixed');
-  blocks.forEach(b => {
-    const sec = psSectionShell(b);
-    sec.querySelector('.ps-sec-body').innerHTML = psLines(b.text).join('');
-    fixed.appendChild(sec);
-  });
-  if (ps.comment) {
-    const c = psSectionShell({ key: 'comment', label: '指導者コメント', color: '#94A3B8', text: '' });
-    c.classList.add('ps-comment');
-    fixed.appendChild(c);
-  }
+  const attMap = psAttsBySection(report);
 
-  const bodies = [...fixed.querySelectorAll('.ps-sec:not(.ps-empty) .ps-sec-body')];
-  const fits = () => !psOverflows(fixed) && bodies.every(b => !psOverflows(b));
+  const buildSections = (withFigs) => {
+    fixed.innerHTML = '';
+    blocks.forEach(b => {
+      const sec = psSectionShell(b);
+      const secBody = sec.querySelector('.ps-sec-body');
+      secBody.innerHTML = psLines(b.text).join('');
+      if (withFigs && attMap[b.key]) {
+        secBody.appendChild(psFigGroup(attMap[b.key], { height: 36 }));
+        sec.classList.remove('ps-empty');
+      }
+      fixed.appendChild(sec);
+    });
+    if (withFigs && attMap['']) {
+      const sec = psSectionShell({ key: 'figs', label: '図・表', color: '#64748B', text: ' ' });
+      sec.querySelector('.ps-sec-body').appendChild(psFigGroup(attMap[''], { height: 40 }));
+      fixed.appendChild(sec);
+    }
+    if (ps.comment) {
+      const c = psSectionShell({ key: 'comment', label: '指導者コメント', color: '#94A3B8', text: '' });
+      c.classList.add('ps-comment');
+      fixed.appendChild(c);
+    }
+  };
 
-  let fs = PS_FONT_MAX;
-  while (!fits() && fs > PS_FONT_MIN) {
-    fs = Math.max(PS_FONT_MIN, fs - 0.25);
+  // 文字を小さくし、足りなければ図を少し縮めて1ページに収める
+  // 図のために本文を読めない大きさまで詰めないよう、図ありのときは下限を高くする
+  const fitPage = ({ fsFloor = PS_FONT_MIN, figFloor = 1 } = {}) => {
+    const bodies = [...fixed.querySelectorAll('.ps-sec:not(.ps-empty) .ps-sec-body')];
+    const fits = () => !psOverflows(fixed) && bodies.every(b => !psOverflows(b));
+    let fs = PS_FONT_MAX;
     page.style.setProperty('--fs', `${fs}pt`);
+    fixed.style.removeProperty('--fig-k');
+    while (!fits() && fs > fsFloor) {
+      fs = Math.max(fsFloor, fs - 0.25);
+      page.style.setProperty('--fs', `${fs}pt`);
+    }
+    let figK = 1;
+    while (!fits() && figK > figFloor) {
+      figK = Math.max(figFloor, figK - 0.05);
+      fixed.style.setProperty('--fig-k', figK.toFixed(2));
+    }
+    return { ok: fits(), fs };
+  };
+
+  const hasFigs = Object.keys(attMap).length > 0;
+  buildSections(hasFigs);
+  let r = fitPage(hasFigs ? { fsFloor: 7.5, figFloor: 0.8 } : {});
+  if (r.ok) return { shrunk: r.fs < PS_FONT_MAX ? r.fs : null, split: false, figsMoved: false };
+
+  // 図を入れたままでは収まらない → 図は「図・表」ページへ回す
+  if (hasFigs) {
+    buildSections(false);
+    r = fitPage();
+    if (r.ok) {
+      psRenderFigPages(stage, dateKey, psAtts(report));
+      return { shrunk: r.fs < PS_FONT_MAX ? r.fs : null, split: false, figsMoved: true };
+    }
   }
-  if (fits()) return { shrunk: fs < PS_FONT_MAX ? fs : null, split: false };
 
   // 最小サイズでも入らない → この日は続きページ方式で流し込む
   stage.removeChild(page.parentElement);
   psFlowRender(stage, [dateKey], { columns: 1, kind: 'ps-kind-daily', dayPerPage: true });
-  return { shrunk: null, split: true };
+  return { shrunk: null, split: true, figsMoved: false };
 }
 
 // ===== レイアウトB: 流し込み（段組・ページ送り） =====
@@ -297,8 +434,25 @@ function psFlowRender(stage, dates, { columns = 2, kind = 'ps-kind-flow', dayPer
     head.innerHTML = `<span class="ps-flow-date">${psDateLong(dateKey)}</span>${dayPerPage ? psStampBoxes() : ''}`;
     placeKeepWithNext(head, 20);
 
+    const attMap = psAttsBySection(report);
+
+    // 図・表は途中で切れないので、入らなければ次の段へ送る
+    const placeFigs = (atts) => {
+      if (!atts) return;
+      atts.forEach(a => {
+        const el = psFigEl(a, { height: columns === 2 ? 34 : 46 });
+        col().appendChild(el);
+        if (psOverflows(col()) && col().children.length > 1) {
+          el.remove();
+          nextCol();
+          col().appendChild(el);
+        }
+      });
+    };
+
     psBlocks(report).forEach(block => {
-      if (!block.text) return; // 流し込みでは空欄を省く
+      if (!block.text && !attMap[block.key]) return; // 流し込みでは空欄を省く
+      if (!block.text) { placeFigs(attMap[block.key]); return; }
       let sec = psSectionShell(block);
       placeKeepWithNext(sec, 10);
       let bodyEl = sec.querySelector('.ps-sec-body');
@@ -326,7 +480,11 @@ function psFlowRender(stage, dates, { columns = 2, kind = 'ps-kind-flow', dayPer
         bodyEl = sec.querySelector('.ps-sec-body');
         bodyEl.append(...carried, line); // 空の段でも入らない長さなら、はみ出しを許容
       });
+
+      placeFigs(attMap[block.key]);
     });
+
+    placeFigs(attMap['']);
 
     if (ps.comment && dayPerPage) {
       const c = psSectionShell({ key: 'comment', label: '指導者コメント', color: '#94A3B8', text: '' });
@@ -543,20 +701,32 @@ async function psRender() {
   if (useCover) psRenderCover(stage, dates);
 
   if (ps.layout === 'daily') {
-    let shrunk = 0, split = 0;
+    let shrunk = 0, split = 0, figsMoved = 0;
     dates.forEach(k => {
       const r = psRenderDaily(stage, k);
       if (r.shrunk) shrunk++;
       if (r.split) split++;
+      if (r.figsMoved) figsMoved++;
     });
     if (shrunk) notes.push(`${shrunk}日分は文字を小さくして1ページに収めました`);
     if (split) notes.push(`${split}日分は長いため続きページに分けました`);
+    if (figsMoved) notes.push(`${figsMoved}日分は図・表を別ページにしました`);
   } else if (ps.layout === 'flow') {
     psFlowRender(stage, dates, { columns: 2 });
   } else {
     const r = psRenderTable(stage, dates);
     if (r.perPage < Math.min(7, dates.length)) notes.push(`文字量が多いため1ページ${r.perPage}日に分割しました`);
     if (r.fs && r.fs < 7) notes.push(`文字サイズ ${r.fs}pt`);
+    // 一覧表には図が入らないので、図・表は後ろのページにまとめる
+    let figDays = 0;
+    dates.forEach(k => {
+      const atts = psAtts(state.reports[k] || {});
+      if (atts.length) {
+        psRenderFigPages(stage, k, atts, { landscape: true });
+        figDays++;
+      }
+    });
+    if (figDays) notes.push(`図・表は後ろのページにまとめました（${figDays}日分）`);
   }
 
   // ページ番号
@@ -609,6 +779,9 @@ function psSyncControls() {
   $('#ps-comment').checked = ps.comment;
   $('#ps-stamp').checked = ps.stamp;
   $('#ps-color').checked = ps.color;
+  $('#ps-figures').checked = ps.figures;
+  $('#ps-fig-size').value = ps.figSize;
+  $('#ps-fig-size').disabled = !ps.figures;
   $('#ps-weekends').value = ps.weekends;
   $('#ps-font').value = ps.font;
   $('#ps-title').value = ps.title;
@@ -672,6 +845,8 @@ function psInitControls() {
   bind('#ps-comment', 'comment');
   bind('#ps-stamp', 'stamp');
   bind('#ps-color', 'color');
+  bind('#ps-figures', 'figures');
+  bind('#ps-fig-size', 'figSize', 'value');
   bind('#ps-weekends', 'weekends', 'value');
   bind('#ps-font', 'font', 'value');
   bind('#ps-title', 'title', 'value');
@@ -762,11 +937,15 @@ function psPlainText() {
   if (who) out.push(who);
   dates.forEach(k => {
     const blocks = psBlocks(state.reports[k] || {}).filter(b => b.text);
-    if (!blocks.length) return;
+    if (!blocks.length && !psAtts(state.reports[k] || {}).length) return;
     out.push('', `━━ ${psDateLong(k)} ━━`);
+    const attMap = psAttsBySection(state.reports[k] || {});
     blocks.forEach(b => {
-      out.push(`【${b.label}】`, b.text.replace(/【(課題点|次回につなげること)】\n/g, '＜$1＞\n'), '');
+      out.push(`【${b.label}】`, b.text.replace(/【(課題点|次回につなげること)】\n/g, '＜$1＞\n'));
+      (attMap[b.key] || []).forEach(a => out.push(`［${a.label}${a.caption ? '：' + a.caption : ''}］`));
+      out.push('');
     });
+    (attMap[''] || []).forEach(a => out.push(`［${a.label}${a.caption ? '：' + a.caption : ''}］`));
   });
   return out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
 }

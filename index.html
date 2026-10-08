@@ -181,6 +181,26 @@
         </div>
 
         <div class="optional-toggle-row" id="optional-row"></div>
+
+        <!-- 図・表 -->
+        <div class="card attach-card" id="attach-card">
+          <div class="section-title">
+            <span class="icon">📎</span> 図・表
+            <span class="attach-count" id="attach-count"></span>
+          </div>
+          <p class="attach-desc">実験結果のグラフ・スクリーンショット・Excelの表を貼り付けると、日報と一緒に印刷できます。</p>
+          <div class="attach-drop" id="attach-drop" tabindex="0" role="button" aria-label="画像を追加">
+            <span class="attach-drop-icon">🖼️</span>
+            <span class="attach-drop-main">画像をドラッグ＆ドロップ／クリックして選択</span>
+            <span class="attach-drop-sub">ここをクリックしてから <kbd>Ctrl</kbd>+<kbd>V</kbd> で、スクリーンショットやExcelの表を貼り付け</span>
+            <input type="file" id="attach-file" accept="image/*" multiple hidden />
+          </div>
+          <div class="attach-list" id="attach-list"></div>
+          <div class="attach-foot">
+            <span class="attach-usage" id="attach-usage"></span>
+            <button type="button" class="attach-mini" id="attach-add-table">＋ 表を作る</button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -277,6 +297,15 @@
             <label class="chk"><input type="checkbox" id="ps-comment" /> 指導者コメント欄</label>
             <label class="chk"><input type="checkbox" id="ps-stamp" /> 確認印の欄</label>
             <label class="chk"><input type="checkbox" id="ps-color" /> カラーで印刷</label>
+            <label class="chk"><input type="checkbox" id="ps-figures" /> 図・表を入れる</label>
+            <div class="ctl-row">
+              <span>図の大きさ</span>
+              <select id="ps-fig-size">
+                <option value="small">小さめ</option>
+                <option value="auto">標準</option>
+                <option value="large">大きめ</option>
+              </select>
+            </div>
             <div class="ctl-row">
               <span>土日</span>
               <select id="ps-weekends">
@@ -318,6 +347,7 @@
 
   <script src="data.js"></script>
   <script src="app.js"></script>
+  <script src="attachments.js"></script>
   <script src="print-studio.js"></script>
 </body>
 </html>

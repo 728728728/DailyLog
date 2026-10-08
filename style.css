@@ -1311,3 +1311,186 @@ kbd {
   clip: rect(0,0,0,0);
   border: 0;
 }
+
+/* ===== 図・表（添付） ===== */
+.attach-card { padding: var(--space-md) var(--space-lg); }
+
+.attach-count {
+  margin-left: auto;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--blue-600);
+  background: var(--blue-50);
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+}
+.attach-count:empty { display: none; }
+
+.attach-desc {
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: var(--space-sm);
+}
+
+.attach-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-md);
+  border: 2px dashed var(--blue-200);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  cursor: pointer;
+  text-align: center;
+  transition: all var(--transition-fast);
+}
+.attach-drop:hover,
+.attach-drop:focus-visible { border-color: var(--blue-400); background: var(--blue-50); outline: none; }
+.attach-drop.over { border-color: var(--blue-500); background: var(--blue-100); transform: scale(1.01); }
+.attach-drop-icon { font-size: 1.4rem; }
+.attach-drop-main { font-size: 0.82rem; font-weight: 700; color: var(--blue-700); }
+.attach-drop-sub { font-size: 0.68rem; color: var(--text-muted); }
+
+.attach-list { display: flex; flex-direction: column; gap: var(--space-sm); }
+.attach-list:not(:empty) { margin-top: var(--space-sm); }
+
+.attach-item {
+  border: 1px solid var(--border-light);
+  border-left: 4px solid var(--blue-300);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-card);
+}
+.attach-item.attach-table { border-left-color: var(--accent-teal); }
+
+.attach-head { display: flex; align-items: center; gap: var(--space-sm); }
+.attach-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--blue-700);
+  white-space: nowrap;
+}
+.attach-caption {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  border-bottom: 1px dashed var(--border-light);
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.82rem;
+  padding: 4px 2px;
+  color: var(--text-primary);
+}
+.attach-caption:focus { outline: none; border-bottom-color: var(--blue-400); }
+.attach-tools { display: flex; gap: 4px; }
+
+.attach-mini {
+  border: 1px solid var(--border-light);
+  background: #fff;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  font-family: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.attach-mini:hover:not(:disabled) { background: var(--blue-50); border-color: var(--blue-300); }
+.attach-mini:disabled { opacity: 0.35; cursor: default; }
+.attach-mini.danger:hover { background: #FFF1F2; border-color: var(--accent-rose); }
+
+.attach-thumb {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-sm);
+  border: none;
+  background: var(--gray-50);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  cursor: zoom-in;
+}
+.attach-thumb img {
+  display: block;
+  max-width: 100%;
+  max-height: 150px;
+  margin: 0 auto;
+  object-fit: contain;
+}
+.attach-item.zoomed .attach-thumb { cursor: zoom-out; }
+.attach-item.zoomed .attach-thumb img { max-height: 70vh; }
+
+.attach-tsv {
+  width: 100%;
+  margin-top: var(--space-sm);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--gray-50);
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 0.76rem;
+  line-height: 1.6;
+  padding: var(--space-sm);
+  resize: vertical;
+  color: var(--text-primary);
+  white-space: pre;
+  overflow-x: auto;
+}
+.attach-tsv:focus { outline: none; border-color: var(--blue-400); }
+
+.attach-foot-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin-top: 6px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.attach-where { display: flex; align-items: center; gap: 4px; }
+.attach-where select,
+.attach-header-chk {
+  font-family: inherit;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+.attach-where select {
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  padding: 2px 4px;
+  background: #fff;
+}
+.attach-header-chk { display: flex; align-items: center; gap: 4px; }
+
+.attach-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.attach-usage.warn { color: #B45309; font-weight: 700; }
+
+/* 前回の日報パネルのサムネイル */
+.prev-thumbs { display: flex; flex-wrap: wrap; gap: 6px; }
+.prev-thumb {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  background: #fff;
+  max-width: 76px;
+}
+.prev-thumb img { display: block; max-width: 100%; max-height: 54px; object-fit: contain; }
+.prev-thumb-label { font-size: 0.6rem; color: var(--text-muted); text-align: center; }
+
+@media (max-width: 800px) {
+  .attach-card { padding: var(--space-md); }
+  .attach-caption { font-size: 16px; }
+  .attach-tsv { font-size: 14px; }
+  .attach-drop-sub { display: none; }
+  .attach-foot-row { font-size: 0.68rem; }
+}

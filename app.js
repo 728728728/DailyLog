@@ -125,6 +125,7 @@ function escapeHtml(str) {
 
 function hasContent(report) {
   if (!report) return false;
+  if (Array.isArray(report.attachments) && report.attachments.length) return true;
   return FIELDS.some(f => report[f] && report[f].trim().length > 0);
 }
 
@@ -147,12 +148,21 @@ let _hasUnsavedChanges = false;
 let _fileHandle = null; // File System Access API用
 
 // --- localStorage ---
+let _quotaWarned = false;
+
 function saveState() {
   try {
     const data = JSON.stringify({ reports: state.reports, settings: state.settings });
     localStorage.setItem(STORAGE_KEY, data);
+    _quotaWarned = false;
   } catch (e) {
     console.error('[DailyLog] localStorage保存エラー:', e);
+    // 図・表を入れると容量上限(約5MB)に達することがある。気づけるように知らせる
+    if (!_quotaWarned) {
+      _quotaWarned = true;
+      showToast('error', '⚠ ブラウザに保存できません',
+        '容量がいっぱいです。💾保存でファイルに書き出し、古い図・表を減らしてください', 12000);
+    }
   }
   _hasUnsavedChanges = true;
   updateSaveIndicator();
@@ -551,6 +561,7 @@ function loadReportForDate(dateKey) {
   FIELDS.forEach(field => autoGrow($(`#input-${field}`)));
   updateProgress();
   renderCarryBanner();
+  renderAttachments();
 
   const ind = $('#save-indicator');
   if (report.updatedAt) {
@@ -869,6 +880,24 @@ function renderPrevDay() {
     `;
   });
 
+  const atts = Array.isArray(report.attachments) ? report.attachments : [];
+  if (atts.length) {
+    html += `
+      <div class="prev-day-section">
+        <div class="prev-day-label" style="--sec-color:#64748B"><span>📎 図・表</span></div>
+        <div class="prev-thumbs">
+          ${atts.map(a => {
+            const label = attLabel(a, atts);
+            const inner = a.kind === 'image'
+              ? `<img src="${a.src}" alt="${escapeHtml(a.caption || label)}">`
+              : `<div class="prev-thumb-label">▦</div>`;
+            return `<div class="prev-thumb" title="${escapeHtml(a.caption || '')}">${inner}<div class="prev-thumb-label">${label}</div></div>`;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
   container.innerHTML = html;
   container.dataset.prevKey = prevKey;
 }
@@ -1123,6 +1152,8 @@ function init() {
   checkFridayBanner();
 
   initEventListeners();
+  initAttachments();
+  renderAttachments();
   initPersistenceGuards();
 
   const isDesktop = window.matchMedia('(min-width: 801px)').matches;
