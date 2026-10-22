@@ -243,6 +243,11 @@
 
       <div class="studio-body">
         <aside class="studio-controls">
+          <!-- 用途のプリセット -->
+          <div class="ctl-group">
+            <button type="button" class="btn-preset" id="ps-preset-note">📓 研究ノートに貼る設定にする</button>
+          </div>
+
           <!-- 期間 -->
           <div class="ctl-group">
             <div class="ctl-label">期間</div>
@@ -313,6 +318,29 @@
                 <option value="large">1枚ずつ（最大）</option>
                 <option value="auto">2枚ずつ</option>
                 <option value="small">4枚ずつ</option>
+              </select>
+            </div>
+            <div class="ctl-row">
+              <span>紙の余白</span>
+              <select id="ps-margin">
+                <option value="normal">標準（11mm）</option>
+                <option value="narrow">せまい（8mm）</option>
+                <option value="min">最小（5mm）</option>
+              </select>
+            </div>
+            <div class="ctl-row">
+              <span>行間・間隔</span>
+              <select id="ps-density">
+                <option value="loose">ゆったり</option>
+                <option value="normal">標準</option>
+                <option value="tight">ぎっしり</option>
+              </select>
+            </div>
+            <div class="ctl-row hidden" id="ps-columns-row">
+              <span>段組</span>
+              <select id="ps-columns">
+                <option value="1">1段（幅広く使う）</option>
+                <option value="2">2段</option>
               </select>
             </div>
             <div class="ctl-row">

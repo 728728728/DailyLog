@@ -25,6 +25,17 @@ const PS_DEFAULTS = {
   figures: true,
   figPlacement: 'page',   // page: 別ページに大きく / inline: 本文の中に
   figSize: 'auto',
+  margin: 'normal',       // 紙の余白
+  density: 'normal',      // 行間と枠の間隔
+  columns: 2,             // 2段組・連続のときの段数
+};
+
+// 文字を小さくせずに、紙を使い切るための設定
+const PS_MARGINS = { normal: [11, 13], narrow: [8, 9], min: [5, 6] };
+const PS_DENSITY = {
+  loose:  { lh: 1.72, sp: 1.3 },
+  normal: { lh: 1.55, sp: 1 },
+  tight:  { lh: 1.38, sp: 0.55 },
 };
 
 const PS_FIG_SCALE = { small: 0.75, auto: 1, large: 1.3 };
@@ -213,7 +224,15 @@ function psNewPage(stage, { landscape = false, kind = '' } = {}) {
   page.className = `ps-page ${landscape ? 'ps-landscape' : 'ps-portrait'} ${kind}`;
   if (!ps.color) page.classList.add('ps-mono');
   if (ps.font === 'serif') page.classList.add('ps-serif');
+  if (ps.density === 'tight') page.classList.add('ps-tight');
   page.style.setProperty('--fs', `${PS_FONT_MAX}pt`);
+
+  const [padY, padX] = PS_MARGINS[ps.margin] || PS_MARGINS.normal;
+  const dens = PS_DENSITY[ps.density] || PS_DENSITY.normal;
+  page.style.setProperty('--pad-y', `${padY}mm`);
+  page.style.setProperty('--pad-x', `${padX}mm`);
+  page.style.setProperty('--lh', dens.lh);
+  page.style.setProperty('--sp', dens.sp);
 
   const who = [ps.affiliation, ps.author].filter(Boolean).map(escapeHtml).join('　');
   page.innerHTML = `
@@ -766,7 +785,7 @@ async function psRender() {
     if (split) notes.push(`${split}日分は長いため続きページに分けました`);
     if (figsMoved) notes.push(`${figsMoved}日分は図・表を別ページにしました`);
   } else if (ps.layout === 'flow') {
-    psFlowRender(stage, dates, { columns: 2 });
+    psFlowRender(stage, dates, { columns: Number(ps.columns) || 2 });
     if (ps.figPlacement !== 'inline') {
       let figDays = 0;
       dates.forEach(k => {
@@ -805,6 +824,7 @@ async function psRender() {
   fit.classList.toggle('warn', clipped > 0);
   if (clipped) notes.unshift(`⚠ ${clipped}か所で文字が収まりきっていません。レイアウトを変えてください`);
   if (clamped) notes.push('表紙のまとめ欄は長いため一部を省略しています');
+  if (ps.margin === 'min') notes.push('余白が最小です。端が切れる場合は印刷設定の倍率を100%・余白なしに');
   fit.textContent = notes.length ? `ℹ️ ${notes.join(' ／ ')}` : '✓ すべての文字が切れずに収まっています';
   psFitPreview();
 }
@@ -853,6 +873,10 @@ function psSyncControls() {
       ? { small: '小さめ', auto: '標準', large: '大きめ' }[o.value]
       : { small: '4枚ずつ', auto: '2枚ずつ', large: '1枚ずつ（最大）' }[o.value];
   });
+  $('#ps-margin').value = ps.margin;
+  $('#ps-density').value = ps.density;
+  $('#ps-columns').value = String(ps.columns);
+  $('#ps-columns-row').classList.toggle('hidden', ps.layout !== 'flow');
   $('#ps-weekends').value = ps.weekends;
   $('#ps-font').value = ps.font;
   $('#ps-title').value = ps.title;
@@ -920,11 +944,23 @@ function psInitControls() {
   bind('#ps-figures', 'figures');
   bind('#ps-fig-placement', 'figPlacement', 'value');
   bind('#ps-fig-size', 'figSize', 'value');
+  bind('#ps-margin', 'margin', 'value');
+  bind('#ps-density', 'density', 'value');
+  bind('#ps-columns', 'columns', 'value');
   bind('#ps-weekends', 'weekends', 'value');
   bind('#ps-font', 'font', 'value');
   bind('#ps-title', 'title', 'value');
   bind('#ps-affiliation', 'affiliation', 'value');
   bind('#ps-author', 'author', 'value');
+
+  $('#ps-preset-note').addEventListener('click', () => {
+    Object.assign(ps, {
+      layout: 'flow', columns: 2, margin: 'min', density: 'tight',
+      cover: false, skipEmptyFields: true, skipEmpty: true,
+    });
+    psChanged();
+    showToast('success', '📓 ノート貼り付け向けにしました', '余白と行間を詰めて、日付をつめて並べます', 3000);
+  });
 
   $('#studio-close').addEventListener('click', closePrintStudio);
   $('#print-studio').addEventListener('click', (e) => {
