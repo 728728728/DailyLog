@@ -39,16 +39,16 @@ const SECTIONS = [
     starters: ['完了：', '途中まで：', '数値で言うと、'],
   },
   {
-    key: 'insights', icon: '💡', label: '考察・気づき', color: '#818CF8',
-    hint: '結果の解釈・想定とのギャップ・新たな発見',
-    question: '想定と違ったこと、新しく分かったことは？',
+    key: 'insights', icon: '💡', label: '考察・気づき', color: '#818CF8', optional: true,
+    hint: 'その日全体としての解釈・気づき',
+    question: '一日を通して、想定と違ったこと・分かったことは？',
     placeholder: '例：\n・Xの条件ではYが予想に反して減少した → Zの影響が考えられる\n・先行研究AとBの結果に矛盾がある → 実験条件の違いを比較する必要あり',
     starters: ['想定と違ったのは、', 'その理由として考えられるのは、', '次に確かめたいのは、', ' → '],
   },
   {
-    key: 'issues', icon: '⚠️', label: '課題点', color: '#FBBF24',
-    hint: '問題点・改善すべきこと',
-    question: 'うまくいかなかったこと、詰まったことは？',
+    key: 'issues', icon: '⚠️', label: '課題点', color: '#FBBF24', optional: true,
+    hint: 'その日全体としての問題点',
+    question: '一日を通して、残っている課題は？',
     placeholder: '例：\n・分析手法の選定に迷っている\n・参考文献が足りない\n・集中力が午後に切れやすい',
     starters: ['詰まった点：', '原因：', '時間がかかった点：'],
   },
@@ -463,7 +463,9 @@ function renderCalendar() {
     grid.appendChild(createCalDay(d, false, {
       isToday: isSameDay(cellDate, today),
       isSelected: state.selectedDate === dateKey,
-      level: filled === 0 ? (hasContent(report) ? 1 : 0) : filled <= 2 ? 1 : filled <= 4 ? 2 : 3,
+      level: filled === 0 ? (hasContent(report) ? 1 : 0)
+        : filled / CORE_FIELDS.length <= 0.34 ? 1
+        : filled / CORE_FIELDS.length <= 0.67 ? 2 : 3,
       filled,
       dow: cellDate.getDay(),
       dateKey,

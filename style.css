@@ -888,6 +888,9 @@ kbd {
 }
 .report-textarea::placeholder { color: var(--text-muted); font-size: 0.82rem; }
 
+/* 出来たことは、考察・課題もここに書くので広めに */
+.report-section[data-section="achieved"] .report-textarea { min-height: 150px; }
+
 /* 書き出しヒント：フォーカス中だけ表示 */
 .starter-bar {
   display: none;

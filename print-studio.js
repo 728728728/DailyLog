@@ -13,6 +13,7 @@ const PS_DEFAULTS = {
   merge: true,
   cover: true,
   skipEmpty: true,
+  skipEmptyFields: true,
   comment: false,
   stamp: false,
   color: true,
@@ -359,11 +360,13 @@ function psRenderDaily(stage, dateKey) {
   const buildSections = (withFigs) => {
     fixed.innerHTML = '';
     blocks.forEach(b => {
+      const figs = withFigs && attMap[b.key];
+      if (ps.skipEmptyFields && !b.text && !figs) return; // 未記入の項目は枠ごと省く
       const sec = psSectionShell(b);
       const secBody = sec.querySelector('.ps-sec-body');
       secBody.innerHTML = psLines(b.text).join('');
-      if (withFigs && attMap[b.key]) {
-        secBody.appendChild(psFigGroup(attMap[b.key], { height: 44 }));
+      if (figs) {
+        secBody.appendChild(psFigGroup(figs, { height: 44 }));
         sec.classList.remove('ps-empty');
       }
       fixed.appendChild(sec);
@@ -543,7 +546,12 @@ function psFlowRender(stage, dates, { columns = 2, kind = 'ps-kind-flow', dayPer
 // ===== レイアウトC: 一覧表（横向き） =====
 function psRenderTable(stage, dates) {
   const probeReport = {};
-  const rows = psBlocks(probeReport).map(b => ({ key: b.key, label: b.label, color: b.color }));
+  let rows = psBlocks(probeReport).map((b, i) => ({ key: b.key, label: b.label, color: b.color, index: i }));
+  if (ps.skipEmptyFields) {
+    const cells = dates.map(k => psBlocks(state.reports[k] || {}));
+    const kept = rows.filter(r => cells.some(c => (c[r.index] || {}).text));
+    if (kept.length) rows = kept;
+  }
   let perPage = Math.min(7, dates.length) || 1;
 
   const build = (chunk, rowStart = 0, lineSkip = 0) => {
@@ -568,7 +576,7 @@ function psRenderTable(stage, dates) {
             ${rows.slice(rowStart).map((r, i) => `
               <tr style="--c:${r.color}">
                 <th class="ps-row-label">${escapeHtml(r.label)}</th>
-                ${cells.map(c => `<td>${psLines(c[rowStart + i].text).slice(i === 0 ? lineSkip : 0).join('') || '<span class="ps-dash">—</span>'}</td>`).join('')}
+                ${cells.map(c => `<td>${psLines(c[r.index].text).slice(i === 0 ? lineSkip : 0).join('') || '<span class="ps-dash">—</span>'}</td>`).join('')}
               </tr>`).join('')}
           </tbody>
         </table>
@@ -624,7 +632,7 @@ function psRenderTable(stage, dates) {
         td.lastElementChild.remove();
         kept--;
       }
-      const total = psLines(psBlocks(state.reports[k] || {})[rowStart].text).length;
+      const total = psLines(psBlocks(state.reports[k] || {})[rows[rowStart].index].text).length;
       lineSkip += kept;
       if (lineSkip >= total) { rowStart++; lineSkip = 0; }
     }
@@ -830,6 +838,7 @@ function psSyncControls() {
   $('#ps-cover').checked = ps.cover;
   $('#ps-cover').disabled = ps.layout === 'table';
   $('#ps-skip-empty').checked = ps.skipEmpty;
+  $('#ps-skip-empty-fields').checked = ps.skipEmptyFields;
   $('#ps-comment').checked = ps.comment;
   $('#ps-stamp').checked = ps.stamp;
   $('#ps-color').checked = ps.color;
@@ -904,6 +913,7 @@ function psInitControls() {
   bind('#ps-merge', 'merge');
   bind('#ps-cover', 'cover');
   bind('#ps-skip-empty', 'skipEmpty');
+  bind('#ps-skip-empty-fields', 'skipEmptyFields');
   bind('#ps-comment', 'comment');
   bind('#ps-stamp', 'stamp');
   bind('#ps-color', 'color');
