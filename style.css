@@ -909,6 +909,13 @@ kbd {
   transition: all var(--transition-fast);
 }
 .starter:hover { border-color: var(--sec-color); color: var(--blue-700); background: #fff; }
+.starter.chain-chip {
+  border-color: var(--blue-200);
+  background: var(--blue-50);
+  color: var(--blue-700);
+  font-weight: 700;
+}
+.starter.chain-chip:hover { background: #fff; border-color: var(--blue-400); }
 
 .optional-toggle-row {
   display: flex;
@@ -1075,6 +1082,26 @@ kbd {
   background: var(--gray-50);
   border-radius: var(--radius-sm);
   border-left: 3px solid var(--sec-color, var(--border-light));
+}
+
+.prev-plain { display: block; }
+.prev-kid {
+  display: block;
+  margin: 2px 0 2px 8px;
+  padding: 1px 0 1px 7px;
+  border-left: 3px solid var(--c, var(--border-light));
+}
+.prev-kid i {
+  display: inline-block;
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #fff;
+  background: var(--c, var(--text-muted));
+  border-radius: 4px;
+  padding: 0 5px;
+  margin-right: 5px;
+  vertical-align: 1px;
 }
 
 .prev-day-empty {

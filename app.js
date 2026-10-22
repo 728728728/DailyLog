@@ -33,9 +33,9 @@ const SECTIONS = [
   },
   {
     key: 'achieved', icon: '✅', label: '出来たこと', color: '#34D399',
-    hint: '成果・達成できたこと',
+    hint: '成果と、それに対する考察・課題',
     question: '目的に対して、何が形になりましたか？',
-    placeholder: '例：\n・第3章の初稿が完成した\n・グラフを3つ作成できた\n・先行研究の要点を整理できた',
+    placeholder: '例：\n・第3章の初稿が完成した\n　→考察：先行研究との差分が主張しやすくなった\n　→課題：図の根拠データが足りない\n・グラフを3つ作成できた\n　→次：ゼミで見せて意見をもらう',
     starters: ['完了：', '途中まで：', '数値で言うと、'],
   },
   {
@@ -74,6 +74,39 @@ const SECTIONS = [
     starters: ['先生へ：', '先輩へ：', '共有事項：'],
   },
 ];
+
+// ===== 成果 → 考察・課題 のつながり（チェーン記法） =====
+// 例）・モデルの精度が上がった
+//       →考察：CRPの寄与が大きい
+//       →課題：閾値の決め方が曖昧
+const CHAIN_KINDS = [
+  { key: 'insight',  label: '考察', icon: '💡', color: '#818CF8', aliases: ['考察', '気づき', 'きづき', 'わかったこと'] },
+  { key: 'issue',    label: '課題', icon: '⚠',  color: '#FBBF24', aliases: ['課題', '問題', '詰まり'] },
+  { key: 'next',     label: '次',   icon: '🔮', color: '#A78BFA', aliases: ['次', '次回', 'やること', 'ToDo', 'todo'] },
+  { key: 'question', label: '疑問', icon: '❓', color: '#38BDF8', aliases: ['疑問', '要確認', '確認'] },
+];
+
+const CHAIN_RE = /^([\s　]*)(?:→|->|⇒|=>)[\s　]*([^\s　:：]{1,8})[\s　]*[:：]?[\s　]*(.*)$/;
+
+// 1行がチェーンの子（→考察：…）なら、その種類と本文を返す
+function parseChainLine(line) {
+  const m = String(line || '').match(CHAIN_RE);
+  if (!m) return null;
+  const kind = CHAIN_KINDS.find(k => k.aliases.includes(m[2]));
+  if (!kind) return null;
+  return { kind, indent: m[1], text: m[3] };
+}
+
+// 本文の中の「成果の数」と「ぶら下がりの数」を数える
+function chainStats(text) {
+  const out = { items: 0, insight: 0, issue: 0, next: 0, question: 0, any: 0 };
+  String(text || '').split('\n').forEach(line => {
+    const c = parseChainLine(line);
+    if (c) { out[c.kind.key]++; out.any++; return; }
+    if (line.trim()) out.items++;
+  });
+  return out;
+}
 
 const FIELDS = SECTIONS.map(s => s.key);
 const CORE_FIELDS = SECTIONS.filter(s => !s.optional).map(s => s.key);
@@ -504,6 +537,7 @@ function buildSections() {
       <textarea class="report-textarea" id="input-${s.key}" data-field="${s.key}" rows="3"></textarea>
       <div class="starter-bar" aria-label="書き出しのヒント">
         <button type="button" class="starter" data-insert="bullet">・ 箇条書き</button>
+        ${CHAIN_KINDS.slice(0, 3).map(k => `<button type="button" class="starter chain-chip" data-insert="chain" data-kind="${k.key}" title="直前の行にぶら下げて書く">→${k.label}</button>`).join('')}
         <button type="button" class="starter" data-insert="time">🕒 時刻</button>
         ${s.starters.map(t => `<button type="button" class="starter" data-insert="text" data-text="${escapeHtml(t)}">${escapeHtml(t.trim())}</button>`).join('')}
       </div>
@@ -596,7 +630,14 @@ function updateProgress() {
     const v = (report[f] || '').trim();
     const sec = $(`.report-section[data-section="${f}"]`);
     sec.classList.toggle('filled', !!v);
-    $(`#count-${f}`).textContent = v ? `${v.replace(/\s/g, '').length}字` : '';
+    const st = chainStats(v);
+    const chips = CHAIN_KINDS
+      .filter(k => st[k.key])
+      .map(k => `${k.icon}${st[k.key]}`)
+      .join(' ');
+    $(`#count-${f}`).textContent = v
+      ? (chips ? `${chips} ・ ${v.replace(/\s/g, '').length}字` : `${v.replace(/\s/g, '').length}字`)
+      : '';
   });
   updateGuideSteps();
 }
@@ -668,6 +709,21 @@ function handleSmartEnter(e) {
   if (ta.selectionStart !== ta.selectionEnd) return;
 
   const { start, end, line, before } = currentLineInfo(ta);
+
+  // 「→考察：…」の行でEnter → 同じ種類のぶら下がりを続ける。空ならやめる
+  const chain = parseChainLine(line);
+  if (chain && before.trim()) {
+    e.preventDefault();
+    if (!chain.text.trim() && ta.selectionStart === end) {
+      // 空のままEnter → ぶら下がりを終えて、次の成果を書ける位置に戻す
+      ta.setSelectionRange(start, end);
+      insertText(ta, '');
+      return;
+    }
+    insertText(ta, `\n${chain.indent}→${chain.kind.label}：`);
+    return;
+  }
+
   const m = line.match(BULLET_RE);
   if (!m || before.length < m[1].length + m[2].length) return;
 
@@ -683,9 +739,17 @@ function handleSmartEnter(e) {
   insertText(ta, '\n' + indent + nextMarker);
 }
 
-function insertStarter(ta, kind, text) {
-  const { before } = currentLineInfo(ta);
+function insertStarter(ta, kind, text, kindKey) {
+  const { line, before } = currentLineInfo(ta);
   const lineHasText = before.trim().length > 0;
+  if (kind === 'chain') {
+    const k = CHAIN_KINDS.find(c => c.key === kindKey);
+    // 今の行がすでにぶら下がりなら、その字下げに合わせる
+    const cur = parseChainLine(line);
+    const indent = cur ? cur.indent : '　';
+    insertText(ta, `${line.trim() ? '\n' : ''}${indent}→${k.label}：`);
+    return;
+  }
   if (kind === 'bullet') {
     insertText(ta, (lineHasText ? '\n' : '') + '・');
   } else if (kind === 'time') {
@@ -844,6 +908,17 @@ function moveSectionFocus(delta) {
   focusSection(cur === -1 ? 0 : cur + delta);
 }
 
+// 画面表示用：ぶら下がり行に色付きのラベルを付ける
+function chainTextHtml(text) {
+  return String(text || '').split('\n').map(line => {
+    const c = parseChainLine(line);
+    if (c) {
+      return `<span class="prev-kid" style="--c:${c.kind.color}"><i>${escapeHtml(c.kind.label)}</i>${escapeHtml(c.text)}</span>`;
+    }
+    return `<span class="prev-plain">${escapeHtml(line)}</span>`;
+  }).join('');
+}
+
 // ===== Previous Report Panel =====
 const CARRY_TARGET = { next: 'objective' };
 
@@ -885,7 +960,7 @@ function renderPrevDay() {
           <span>${s.icon} ${s.label}</span>
           <button type="button" class="prev-carry" data-carry="${s.key}" data-target="${target}">↩ ${btnLabel}</button>
         </div>
-        <div class="prev-day-content" style="--sec-color:${s.color}">${escapeHtml(content)}</div>
+        <div class="prev-day-content" style="--sec-color:${s.color}">${chainTextHtml(content)}</div>
       </div>
     `;
   });
@@ -1029,7 +1104,7 @@ function initEventListeners() {
     const starter = e.target.closest('.starter');
     if (starter) {
       const ta = starter.closest('.report-section').querySelector('textarea');
-      insertStarter(ta, starter.dataset.insert, starter.dataset.text || '');
+      insertStarter(ta, starter.dataset.insert, starter.dataset.text || '', starter.dataset.kind);
       return;
     }
     const collapse = e.target.closest('[data-collapse]');

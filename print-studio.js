@@ -162,16 +162,36 @@ function psInline(str) {
 // テキスト → 行HTMLの配列（箇条書きはぶら下げインデント）
 function psLines(text) {
   if (!text) return [];
-  return text.split('\n').map(raw => {
-    const line = raw.replace(/\s+$/, '');
+  const rows = text.split('\n').map(raw => ({ raw: raw.replace(/\s+$/, ''), chain: parseChainLine(raw) }));
+
+  // ぶら下がり行の持ち主（直前の通常行）に印を付ける
+  rows.forEach((row, i) => {
+    if (!row.chain) return;
+    for (let j = i - 1; j >= 0; j--) {
+      if (rows[j].chain) continue;
+      if (rows[j].raw.trim()) rows[j].isHead = true;
+      break;
+    }
+  });
+
+  return rows.map(row => {
+    const line = row.raw;
     if (!line.trim()) return '<p class="ps-line ps-gap"></p>';
+
+    if (row.chain) {
+      const k = row.chain.kind;
+      return `<p class="ps-line ps-kid" style="--c:${k.color}">`
+        + `<span class="ps-kid-tag">${escapeHtml(k.label)}</span>${psInline(row.chain.text)}</p>`;
+    }
+
+    const head = row.isHead ? ' ps-chain-head' : '';
     const m = line.match(/^(\s*)(・|[-*•]\s|(\d+)[.．)）]\s?)(.*)$/);
     if (m) {
       const depth = Math.min(3, Math.floor(m[1].replace(/　/g, '  ').length / 2));
       const mark = m[3] ? `${m[3]}.` : '・';
-      return `<p class="ps-line ps-bullet" style="--d:${depth}"><span class="ps-mark">${mark}</span>${psInline(m[4])}</p>`;
+      return `<p class="ps-line ps-bullet${head}" style="--d:${depth}"><span class="ps-mark">${mark}</span>${psInline(m[4])}</p>`;
     }
-    return `<p class="ps-line">${psInline(line)}</p>`;
+    return `<p class="ps-line${head}">${psInline(line)}</p>`;
   });
 }
 

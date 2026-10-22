@@ -395,6 +395,38 @@ body.studio-open { overflow: hidden; }
   font-weight: 700;
 }
 .ps-line b { font-weight: 800; }
+
+/* 成果 → 考察・課題 のつながり */
+.ps-chain-head {
+  font-weight: 800;
+  background: #f1f5f9;
+  border-radius: 0.8mm;
+  padding: 0.4mm 1.4mm 0.4mm 1mm;
+  margin-top: 1.2mm;
+}
+.ps-chain-head.ps-bullet { padding-left: calc(1.1em + 1mm); }
+.ps-kid {
+  --c: #94A3B8;
+  margin-left: 2.5mm;
+  padding: 0.3mm 0 0.3mm 2.2mm;
+  border-left: 0.7mm solid var(--c);
+  text-indent: 0;
+}
+.ps-kid-tag {
+  display: inline-block;
+  min-width: 7mm;
+  text-align: center;
+  font-size: 0.78em;
+  font-weight: 800;
+  color: #fff;
+  background: var(--c);
+  border-radius: 0.8mm;
+  padding: 0 1.2mm;
+  margin-right: 1.4mm;
+  vertical-align: 0.3mm;
+}
+.ps-mono .ps-kid { --c: #6b7280 !important; }
+.ps-mono .ps-chain-head { background: #eee; }
 .ps-arrow { color: var(--c, var(--sub)); font-weight: 700; }
 .ps-dash { color: #c0c6cf; }
 
