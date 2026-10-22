@@ -25,6 +25,7 @@ const PS_DEFAULTS = {
   figures: true,
   figPlacement: 'page',   // page: 別ページに大きく / inline: 本文の中に
   figSize: 'auto',
+  fsMax: 9.5,             // 自動で紙を埋めるときの文字サイズの上限(pt)
   margin: 'normal',       // 紙の余白
   density: 'normal',      // 行間と枠の間隔
   columns: 2,             // 2段組・連続のときの段数
@@ -33,10 +34,13 @@ const PS_DEFAULTS = {
 // 文字を小さくせずに、紙を使い切るための設定
 const PS_MARGINS = { normal: [11, 13], narrow: [8, 9], min: [5, 6] };
 const PS_DENSITY = {
+  fill:   { lh: 1.55, sp: 1 },   // 余った分だけ行間を広げて紙を埋める（文字の大きさは変えない）
   loose:  { lh: 1.72, sp: 1.3 },
   normal: { lh: 1.55, sp: 1 },
   tight:  { lh: 1.38, sp: 0.55 },
 };
+const PS_FILL_LH_MAX = 2.6;
+const PS_FILL_SP_MAX = 3;
 
 const PS_FIG_SCALE = { small: 0.75, auto: 1, large: 1.3 };
 const PS_FIG_PER_PAGE = { large: 1, auto: 2, small: 4 }; // 別ページのとき
@@ -419,7 +423,43 @@ function psRenderDaily(stage, dateKey) {
       figK = Math.max(figFloor, figK - 0.05);
       fixed.style.setProperty('--fig-k', figK.toFixed(2));
     }
+    if (fits()) fillPage(fits);
     return { ok: fits(), fs };
+  };
+
+  // 文字の大きさは変えずに、行間 → 枠の内側の間隔 の順に広げて紙を使い切る
+  const fillPage = (fits) => {
+    if (ps.density !== 'fill') return;
+
+    // 文章量に応じて枠の伸びしろを配る（短い項目だけが間延びしないように）
+    const secs = [...fixed.querySelectorAll('.ps-sec')];
+    secs.forEach(sec => {
+      const body = sec.querySelector('.ps-sec-body');
+      sec.style.flexGrow = Math.max(0.5, body.scrollHeight / 24).toFixed(2);
+    });
+
+    const grow = (prop, from, max, step) => {
+      let cur = from;
+      while (cur + step <= max) {
+        page.style.setProperty(prop, (cur + step).toFixed(2));
+        if (!fits()) { page.style.setProperty(prop, cur.toFixed(2)); break; }
+        cur += step;
+      }
+      return cur;
+    };
+
+    // 上限を決めてある場合だけ、文字を少しだけ大きくする（既定は広げない）
+    const fsMax = Number(ps.fsMax) || PS_FONT_MAX;
+    let fs = PS_FONT_MAX;
+    while (fs + 0.25 <= fsMax) {
+      page.style.setProperty('--fs', `${(fs + 0.25).toFixed(2)}pt`);
+      if (!fits()) { page.style.setProperty('--fs', `${fs.toFixed(2)}pt`); break; }
+      fs += 0.25;
+    }
+
+    const base = PS_DENSITY.fill;
+    grow('--lh', base.lh, PS_FILL_LH_MAX, 0.05);
+    grow('--sp', base.sp, PS_FILL_SP_MAX, 0.1);
   };
 
   const allAtts = psAtts(report);
@@ -875,6 +915,8 @@ function psSyncControls() {
   });
   $('#ps-margin').value = ps.margin;
   $('#ps-density').value = ps.density;
+  $('#ps-fsmax').value = String(ps.fsMax);
+  $('#ps-fsmax-row').classList.toggle('hidden', ps.density !== 'fill');
   $('#ps-columns').value = String(ps.columns);
   $('#ps-columns-row').classList.toggle('hidden', ps.layout !== 'flow');
   $('#ps-weekends').value = ps.weekends;
@@ -946,6 +988,7 @@ function psInitControls() {
   bind('#ps-fig-size', 'figSize', 'value');
   bind('#ps-margin', 'margin', 'value');
   bind('#ps-density', 'density', 'value');
+  bind('#ps-fsmax', 'fsMax', 'value');
   bind('#ps-columns', 'columns', 'value');
   bind('#ps-weekends', 'weekends', 'value');
   bind('#ps-font', 'font', 'value');
@@ -955,11 +998,12 @@ function psInitControls() {
 
   $('#ps-preset-note').addEventListener('click', () => {
     Object.assign(ps, {
-      layout: 'flow', columns: 2, margin: 'min', density: 'tight',
-      cover: false, skipEmptyFields: true, skipEmpty: true,
+      layout: 'daily', margin: 'min', density: 'fill',
+      figPlacement: 'inline', cover: false, skipEmptyFields: true, skipEmpty: true,
     });
     psChanged();
-    showToast('success', '📓 ノート貼り付け向けにしました', '余白と行間を詰めて、日付をつめて並べます', 3000);
+    showToast('success', '📓 ノート貼り付け向けにしました',
+      '1日1枚・余白最小。文字の大きさはそのままで、行間を広げて紙を埋めます', 3500);
   });
 
   $('#studio-close').addEventListener('click', closePrintStudio);
