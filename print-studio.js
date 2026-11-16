@@ -9,7 +9,7 @@
 const PS_DEFAULTS = {
   layout: 'daily',
   rangeMode: 'week',
-  fields: { objective: true, done: true, achieved: true, insights: true, issues: true, next: true, references: false, consultation: true },
+  fields: { objective: true, done: true, achieved: true, insights: true, issues: true, next: true, tomorrow: true, references: false, consultation: true },
   merge: true,
   cover: true,
   skipEmpty: true,
@@ -708,7 +708,7 @@ function psRenderCover(stage, dates) {
   const charsOf = r => FIELDS.reduce((a, f) => a + (r[f] || '').replace(/\s/g, '').length, 0);
   const totalChars = recorded.reduce((a, x) => a + charsOf(x.r), 0);
   const maxChars = Math.max(1, ...all.map(x => charsOf(x.r)));
-  const lastWithNext = [...recorded].reverse().find(x => (x.r.next || '').trim());
+  const lastWithNext = [...recorded].reverse().find(x => ((x.r.tomorrow || '').trim() || (x.r.next || '').trim()));
   const lastWithIssues = [...recorded].reverse().find(x => (x.r.issues || '').trim());
   const consults = recorded.filter(x => (x.r.consultation || '').trim());
   const who = [ps.affiliation, ps.author].filter(Boolean).map(escapeHtml).join('<br>');
@@ -757,7 +757,7 @@ function psRenderCover(stage, dates) {
       <div class="ps-cover-grid">
         <div class="ps-box" style="--c:#A78BFA">
           <div class="ps-box-h">次にやること${lastWithNext ? `<small>${psDateShort(lastWithNext.k)}時点</small>` : ''}</div>
-          <div class="ps-box-b">${lastWithNext ? psLines(lastWithNext.r.next.trim()).join('') : '<span class="ps-dash">—</span>'}</div>
+          <div class="ps-box-b">${lastWithNext ? psLines(((lastWithNext.r.tomorrow || '').trim() || lastWithNext.r.next.trim())).join('') : '<span class="ps-dash">—</span>'}</div>
         </div>
         <div class="ps-box" style="--c:#FBBF24">
           <div class="ps-box-h">残っている課題${lastWithIssues ? `<small>${psDateShort(lastWithIssues.k)}時点</small>` : ''}</div>

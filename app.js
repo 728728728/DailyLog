@@ -60,6 +60,13 @@ const SECTIONS = [
     starters: ['明日まず、', '優先度高：', '確認する人：'],
   },
   {
+    key: 'tomorrow', icon: '☑️', label: '明日やること', color: '#10B981',
+    hint: '明日の持ち物リスト。箇条書きで',
+    question: '明日、まず何から手をつけますか？',
+    placeholder: '例：\n・第4章の構成案を書く\n・教授に分析手法を相談する\n・9時から2時間、解析にあてる',
+    starters: ['朝イチで、', '午後に、', '〆切：'],
+  },
+  {
     key: 'references', icon: '📚', label: '参照文献・資料', color: '#FB923C', optional: true,
     hint: '今日参照した論文・サイト・書籍',
     question: '今日参照した文献・資料は？',
@@ -798,7 +805,8 @@ function renderCarryBanner() {
   const prevKey = findPrevReportDate(state.selectedDate);
   const prev = prevKey && state.reports[prevKey];
   const cur = state.reports[state.selectedDate] || {};
-  const nextText = prev && prev.next ? prev.next.trim() : '';
+  // 「明日やること」があればそれを、なければ「次回につなげること」を提案する
+  const nextText = prev ? ((prev.tomorrow || '').trim() || (prev.next || '').trim()) : '';
   // 目的がまだ空のときだけ提案する（書き始めたら邪魔しない）
   const objectiveWritten = !!(cur.objective || '').trim();
 
@@ -922,7 +930,7 @@ function chainTextHtml(text) {
 }
 
 // ===== Previous Report Panel =====
-const CARRY_TARGET = { next: 'objective' };
+const CARRY_TARGET = { next: 'objective', tomorrow: 'objective' };
 
 function renderPrevDay() {
   const container = $('#prev-day-content');
@@ -1144,9 +1152,11 @@ function initEventListeners() {
   // Carry-over
   $('#btn-carry').addEventListener('click', () => {
     const prevKey = findPrevReportDate(state.selectedDate);
-    const text = prevKey ? (state.reports[prevKey].next || '').trim() : '';
+    const prev = prevKey ? state.reports[prevKey] : null;
+    const fromTomorrow = prev && (prev.tomorrow || '').trim();
+    const text = fromTomorrow || (prev ? (prev.next || '').trim() : '');
     if (!text) return;
-    carryInto('objective', text, '前回の「次回につなげること」');
+    carryInto('objective', text, `前回の「${fromTomorrow ? '明日やること' : '次回につなげること'}」`);
   });
   $('#carry-dismiss').addEventListener('click', () => {
     _dismissedCarry.add(state.selectedDate);
