@@ -17,6 +17,25 @@
   <!-- ========== Toast Container ========== -->
   <div id="toast-container" class="toast-container"></div>
 
+  <!-- ========== さっとメモ（Ctrl+K / quick.bat で開く） ========== -->
+  <div class="qc hidden" id="quick-capture" role="dialog" aria-modal="true" aria-label="さっとメモ">
+    <div class="qc-card">
+      <div class="qc-head">
+        <span class="qc-title">✍️ さっとメモ</span>
+        <span class="qc-date" id="qc-date"></span>
+        <button class="qc-close" id="qc-close" aria-label="閉じる">✕</button>
+      </div>
+      <textarea id="qc-input" rows="2"
+        placeholder="気になったことを一行で　→ Enter で保存（Shift+Enter で改行）"></textarea>
+      <div class="qc-row">
+        <select id="qc-dest" aria-label="入れる場所"></select>
+        <button class="qc-save" id="qc-save">保存して続ける</button>
+      </div>
+      <div class="qc-added" id="qc-added"></div>
+      <div class="qc-hint"><kbd>Ctrl</kbd>+<kbd>K</kbd> でいつでも開く ／ <kbd>Esc</kbd> で閉じる（日報の画面はそのまま）</div>
+    </div>
+  </div>
+
   <!-- ========== Print Area (印刷時だけ表示) ========== -->
   <div id="print-area"></div>
 
@@ -31,6 +50,9 @@
         <p class="logo-sub">日報管理システム — 毎日の記録を、未来のチカラに</p>
       </div>
       <div class="header-right">
+        <button class="btn-header" id="btn-quick-capture" title="さっとメモ (Ctrl+K)">
+          ✍️ <span class="btn-header-text">メモ</span>
+        </button>
         <button class="btn-header" id="btn-open-studio" title="印刷スタジオを開く (Ctrl+P)">
           🖨️ <span class="btn-header-text">印刷</span>
         </button>
@@ -148,6 +170,7 @@
           <div><kbd>Enter</kbd> 箇条書き「・」「1.」を自動で続ける</div>
           <div>「→考察」などのボタン ＋ <kbd>Enter</kbd> で、成果にぶら下げて書ける</div>
           <div><kbd>Ctrl</kbd>+<kbd>S</kbd> ファイル保存 ／ <kbd>Ctrl</kbd>+<kbd>P</kbd> 印刷スタジオ</div>
+          <div><kbd>Ctrl</kbd>+<kbd>K</kbd> さっとメモ（今日の日報に追記）</div>
         </div>
 
         <!-- Carry-over suggestion -->

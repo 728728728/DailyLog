@@ -1049,6 +1049,98 @@ function integrateWithTodoBlaster() {
   showToast('success', '🔗 連携成功！', `「${name}」をTodoBlasterに追加しました`);
 }
 
+// ===== さっとメモ =====
+// いつでも開いて、今日の日報に一行だけ足せる窓
+const QC_DESTS = ['insights', 'done', 'achieved', 'tomorrow', 'next', 'issues', 'consultation'];
+
+function initQuickCapture() {
+  $('#qc-dest').innerHTML = QC_DESTS
+    .map(k => SECTION_MAP[k])
+    .map(sec => `<option value="${sec.key}">${sec.icon} ${escapeHtml(sec.label)}</option>`)
+    .join('');
+  $('#qc-dest').value = state.settings.quickDest || 'insights';
+
+  $('#btn-quick-capture').addEventListener('click', openQuickCapture);
+  $('#qc-close').addEventListener('click', closeQuickCapture);
+  $('#qc-save').addEventListener('click', quickCaptureSave);
+  $('#quick-capture').addEventListener('click', (e) => {
+    if (e.target.id === 'quick-capture') closeQuickCapture();
+  });
+  $('#qc-dest').addEventListener('change', () => {
+    state.settings.quickDest = $('#qc-dest').value;
+    saveSettings();
+  });
+  $('#qc-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
+      e.preventDefault();
+      quickCaptureSave();
+    }
+  });
+
+  // quick.bat から #quick... 付きで開いたときは、最初からメモ窓を出す
+  // すでにアプリを開いている場合は再読み込みされないので、hashchange でも受ける
+  const wantsQuick = () => location.hash.startsWith('#quick');
+  if (wantsQuick()) setTimeout(openQuickCapture, 60);
+  window.addEventListener('hashchange', () => {
+    if (wantsQuick()) openQuickCapture();
+  });
+}
+
+function openQuickCapture() {
+  const d = new Date();
+  $('#qc-date').textContent = `${d.getMonth() + 1}月${d.getDate()}日（${DAYS_JP[d.getDay()]}）の日報へ`;
+  $('#quick-capture').classList.remove('hidden');
+  document.body.classList.add('qc-open');
+  setTimeout(() => $('#qc-input').focus(), 20);
+}
+
+function closeQuickCapture() {
+  $('#quick-capture').classList.add('hidden');
+  document.body.classList.remove('qc-open');
+  $('#qc-added').innerHTML = '';
+}
+
+function quickCaptureSave() {
+  const input = $('#qc-input');
+  const text = input.value.trim();
+  if (!text) { input.focus(); return; }
+
+  // 画面で編集中の内容を先に確定させてから、stateを触る
+  saveCurrentInputs();
+
+  const field = $('#qc-dest').value;
+  const key = todayISO();
+  if (!state.reports[key]) state.reports[key] = {};
+
+  const lines = text.split('\n')
+    .map(l => l.trim())
+    .filter(Boolean)
+    .map(l => (/^(・|[-*•]|\d+[.．)）]|　*→)/.test(l) ? l : `・${l}`))
+    .join('\n');
+
+  const cur = (state.reports[key][field] || '').replace(/\s+$/, '');
+  state.reports[key][field] = cur ? `${cur}\n${lines}` : lines;
+  state.reports[key].updatedAt = new Date().toISOString();
+  saveState();
+
+  // 今日を開いていれば、その場で反映する
+  if (state.selectedDate === key) {
+    if (SECTION_MAP[field].optional) _openedOptional.add(field);
+    loadReportForDate(key);
+  }
+  renderCalendar();
+  renderStats();
+  renderPrevDay();
+
+  const added = document.createElement('div');
+  added.className = 'qc-added-item';
+  added.textContent = `✓ ${SECTION_MAP[field].label} に追加：${text.split('\n')[0]}`;
+  $('#qc-added').prepend(added);
+
+  input.value = '';
+  input.focus();
+}
+
 // ===== Toast =====
 function showToast(type, title, message, duration = 4000) {
   const icons = { success: '✅', warning: '⚠️', error: '❌' };
@@ -1198,13 +1290,23 @@ function initEventListeners() {
       saveToFile();
       return;
     }
+    if ((e.ctrlKey || e.metaKey) && key === 'k' && !studioOpen) {
+      e.preventDefault();
+      if ($('#quick-capture').classList.contains('hidden')) openQuickCapture();
+      else closeQuickCapture();
+      return;
+    }
+    if (e.key === 'Escape' && !$('#quick-capture').classList.contains('hidden')) {
+      closeQuickCapture();
+      return;
+    }
     if ((e.ctrlKey || e.metaKey) && key === 'p') {
       e.preventDefault();
       if (studioOpen) printFromStudio();
       else openPrintStudio({ anchor: state.selectedDate });
       return;
     }
-    if (studioOpen) return;
+    if (studioOpen || !$('#quick-capture').classList.contains('hidden')) return;
 
     if (e.altKey && !e.ctrlKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
       e.preventDefault();
@@ -1249,6 +1351,7 @@ function init() {
   checkFridayBanner();
 
   initEventListeners();
+  initQuickCapture();
   initAttachments();
   renderAttachments();
   initPersistenceGuards();
