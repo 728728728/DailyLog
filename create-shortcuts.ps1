@@ -5,7 +5,7 @@
 # ブラウザのアプリ窓を直接開くショートカットを作り、DailyLog専用のアイコンと
 # アプリIDを付けます。アプリIDを付けないと、タスクバーに留めたときに
 # ブラウザ（Edge）のアイコンに吸収されてしまいます。
-param([switch]$Desktop)
+param([switch]$Desktop, [switch]$StartMenu, [string]$Hotkey = "CTRL+ALT+D")
 
 $dir  = $PSScriptRoot
 $icon = Join-Path $dir "favicon.ico"
@@ -108,7 +108,7 @@ try { Add-Type -TypeDefinition $code -Language CSharp -ErrorAction Stop } catch 
 $sh = New-Object -ComObject WScript.Shell
 
 function New-DailyLogShortcut {
-  param([string]$Path, [string]$Hash, [string]$Size, [string]$Desc, [string]$AppId, [switch]$FullApp)
+  param([string]$Path, [string]$Hash, [string]$Size, [string]$Desc, [string]$AppId, [switch]$FullApp, [string]$Key)
 
   Remove-Item $Path -Force -ErrorAction SilentlyContinue
   $sc = $sh.CreateShortcut($Path)
@@ -126,6 +126,7 @@ function New-DailyLogShortcut {
   $sc.IconLocation     = "$icon,0"
   $sc.Description      = $Desc
   $sc.WindowStyle      = 7
+  if ($Key) { $sc.Hotkey = $Key }   # スタートメニューに置いた場合だけ効く
   $sc.Save()
 
   # タスクバーで独立したアプリとして扱わせる
@@ -134,11 +135,19 @@ function New-DailyLogShortcut {
 }
 
 $targets = @($dir)
-if ($Desktop) { $targets += [Environment]::GetFolderPath("Desktop") }
+if ($Desktop)   { $targets += [Environment]::GetFolderPath("Desktop") }
+if ($StartMenu) {
+  $sm = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\DailyLog"
+  New-Item -ItemType Directory -Path $sm -Force | Out-Null
+  $targets += $sm
+}
 
 foreach ($t in $targets) {
+  # キー割り当てはスタートメニュー／デスクトップ上のショートカットでのみ機能する
+  $key = ""
+  if ($t -ne $dir) { $key = $Hotkey }
   New-DailyLogShortcut -Path (Join-Path $t "DailyLog さっとメモ.lnk") -Hash "#quick" -Size "640,620" `
-    -Desc "DailyLog - 気になったことをさっとメモ" -AppId "DailyLog.QuickNote"
+    -Desc "DailyLog - 気になったことをさっとメモ" -AppId "DailyLog.QuickNote" -Key $key
   New-DailyLogShortcut -Path (Join-Path $t "DailyLog 日報.lnk") -Hash "" -Size "1280,900" `
     -Desc "DailyLog - 日報を開く" -AppId "DailyLog.Report" -FullApp
 }
@@ -146,5 +155,6 @@ foreach ($t in $targets) {
 Write-Host ""
 if (-not $browser) { Write-Host "※ EdgeもChromeも見つからないため、既定のブラウザで開く形にしました。" }
 Write-Host "できたショートカットを右クリック →「タスクバーにピン留めする」で登録してください。"
+Write-Host "（タスクバーへの登録は Windows の仕様で自動化できないため、ここだけ手作業です）"
 Write-Host "（Windows 11 では「その他のオプションを表示」の中にある場合があります）"
 Write-Host "※ 開いた窓を右クリックして留めると、Edgeのアイコンになります。必ずショートカット側を留めてください。"
