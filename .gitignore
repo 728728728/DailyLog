@@ -7,6 +7,9 @@ data*.js
 *backup*
 backup.json
 
+# ショートカット（パスが環境ごとに違うので、create-shortcuts.ps1 で作る）
+*.lnk
+
 # OS/Editor settings
 .DS_Store
 Thumbs.db
